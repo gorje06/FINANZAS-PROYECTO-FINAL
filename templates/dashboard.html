@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Hola, {{ username }}</h2>
+<section class="grid">
+  <article class="card">
+    <h3>Nuevo plan de crédito</h3>
+    <form method="post" class="form-grid">
+      <label>Nombres<input name="nombres_cliente" required /></label>
+      <label>Apellidos<input name="apellidos_cliente" required /></label>
+      <label>DNI<input name="dni_cliente" maxlength="8" required /></label>
+      <label>Correo<input name="correo_cliente" type="email" /></label>
+      <label>Teléfono<input name="telefono_cliente" maxlength="9" /></label>
+      <label>Dirección<input name="direccion_cliente" /></label>
+      <label>Ingresos mensuales<input name="ingresos_mensuales" type="number" step="0.01" required /></label>
+
+      <label>Marca vehículo<input name="marca_vehiculo" required /></label>
+      <label>Modelo vehículo<input name="modelo_vehiculo" required /></label>
+      <label>Precio vehículo<input name="precio_vehiculo" type="number" step="0.01" required /></label>
+      <label>Cuota inicial (%)<input name="cuota_inicial_pct" type="number" step="0.01" value="20" required /></label>
+
+      <label>Moneda
+        <select name="moneda">
+          <option>Soles</option>
+          <option>Dólares</option>
+        </select>
+      </label>
+      <label>Tipo tasa
+        <select name="tipo_tasa">
+          <option>Efectiva</option>
+          <option>Nominal</option>
+        </select>
+      </label>
+      <label>Tasa interés anual (%)<input name="tasa_interes" type="number" step="0.0001" required /></label>
+      <label>Capitalización (si nominal)<input name="capitalizacion" type="number" step="1" value="12" /></label>
+      <label>Plazo (meses)<input name="plazo_meses" type="number" step="1" value="48" required /></label>
+
+      <label>Periodo de gracia
+        <select name="periodo_gracia">
+          <option>Ninguno</option>
+          <option>Parcial</option>
+          <option>Total</option>
+        </select>
+      </label>
+      <label>Meses de gracia<input name="meses_gracia" type="number" step="1" value="0" /></label>
+      <label>Seguro desgravamen mensual (%)<input name="seguro_desgravamen" type="number" step="0.0001" value="0.03" required /></label>
+      <label>Seguro vehicular mensual (%)<input name="seguro_vehicular" type="number" step="0.0001" value="0.025" required /></label>
+      <label>Portes por cuota<input name="portes" type="number" step="0.01" value="4" required /></label>
+
+      <button type="submit">Generar plan</button>
+    </form>
+  </article>
+
+  <article class="card">
+    <h3>Planes creados</h3>
+    {% if plans %}
+      <ul class="plan-list">
+        {% for plan in plans %}
+          <li>
+            <a href="{{ url_for('plan_detail', plan_id=plan.id) }}">
+              #{{ plan.id }} - {{ plan.nombres_cliente }} {{ plan.apellidos_cliente }} | {{ plan.marca_vehiculo }} {{ plan.modelo_vehiculo }}
+            </a>
+          </li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p>Aún no tienes planes.</p>
+    {% endif %}
+  </article>
+</section>
+{% endblock %}

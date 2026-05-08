@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="card">
+  <h2>Detalle del plan #{{ plan.id }}</h2>
+  <p><b>Cliente:</b> {{ plan.nombres_cliente }} {{ plan.apellidos_cliente }} - DNI {{ plan.dni_cliente }}</p>
+  <p><b>Vehículo:</b> {{ plan.marca_vehiculo }} {{ plan.modelo_vehiculo }}</p>
+  <p><b>Capital financiado:</b> {{ "%.2f"|format(plan.total_financiado) }} {{ plan.moneda }}</p>
+
+  <div class="kpis">
+    <div><span>TEM</span><strong>{{ "%.4f"|format(plan.tem * 100) }}%</strong></div>
+    <div><span>Cuota Base</span><strong>{{ "%.2f"|format(plan.cuota_base) }}</strong></div>
+    <div><span>VAN</span><strong>{{ "%.2f"|format(plan.van) }}</strong></div>
+    <div><span>TIR mensual</span><strong>{{ "%.4f"|format(plan.tir * 100) }}%</strong></div>
+    <div><span>TCEA</span><strong>{{ "%.4f"|format(plan.tcea * 100) }}%</strong></div>
+  </div>
+
+  <h3>Cronograma</h3>
+  <table>
+    <thead>
+      <tr>
+        <th>Periodo</th>
+        <th>Cuota total</th>
+        <th>Interés</th>
+        <th>Amortización</th>
+        <th>Seguro</th>
+        <th>Portes</th>
+        <th>Saldo final</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in schedule %}
+      <tr>
+        <td>{{ row.periodo }}</td>
+        <td>{{ "%.2f"|format(row.cuota_total) }}</td>
+        <td>{{ "%.2f"|format(row.interes) }}</td>
+        <td>{{ "%.2f"|format(row.amortizacion) }}</td>
+        <td>{{ "%.2f"|format(row.seguro) }}</td>
+        <td>{{ "%.2f"|format(row.portes) }}</td>
+        <td>{{ "%.2f"|format(row.saldo_final) }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <p><a href="{{ url_for('dashboard') }}">Volver</a></p>
+</section>
+{% endblock %}

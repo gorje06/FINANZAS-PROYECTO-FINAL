@@ -1,0 +1,250 @@
+* {
+  box-sizing: border-box;
+  font-family: "Segoe UI", "Inter", Arial, Helvetica, sans-serif;
+}
+
+body {
+  margin: 0;
+  color: #31111a;
+  background:
+    radial-gradient(circle at top right, #ffe8ec 0%, #fff5f7 38%, #f7ecef 100%);
+}
+
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 24px;
+  color: #ffffff;
+  background: linear-gradient(120deg, #8b0018 0%, #c1122f 100%);
+  box-shadow: 0 8px 26px rgba(139, 0, 24, 0.3);
+}
+
+.topbar h1 {
+  margin: 0;
+  font-size: 22px;
+  letter-spacing: 0.3px;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.brand img {
+  height: 42px;
+  width: auto;
+  border-radius: 8px;
+}
+
+.brand span {
+  display: inline;
+  font-size: 20px;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.topbar a {
+  color: #ffffff;
+  text-decoration: none;
+  font-weight: 600;
+  padding: 8px 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  transition: all 0.2s ease;
+}
+
+.topbar a:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.container {
+  max-width: 1220px;
+  margin: 0 auto;
+  padding: 24px 20px 40px;
+}
+
+.grid {
+  display: grid;
+  gap: 18px;
+  grid-template-columns: minmax(0, 2fr) minmax(320px, 1fr);
+}
+
+.card {
+  background: #ffffff;
+  border: 1px solid #f3ccd3;
+  border-radius: 18px;
+  padding: 18px;
+  box-shadow: 0 10px 28px rgba(139, 0, 24, 0.12);
+}
+
+.card h2,
+.card h3 {
+  margin-top: 0;
+  color: #8b0018;
+}
+
+.auth {
+  max-width: 420px;
+  margin: 32px auto;
+}
+
+label {
+  display: block;
+  font-size: 13px;
+  margin-bottom: 4px;
+  color: #6a2231;
+  font-weight: 600;
+}
+
+input,
+select,
+button {
+  width: 100%;
+  margin-top: 4px;
+  margin-bottom: 10px;
+  padding: 10px 11px;
+  border: 1px solid #efc8d0;
+  border-radius: 10px;
+  font-size: 14px;
+  background: #fff9fa;
+}
+
+input:focus,
+select:focus {
+  outline: none;
+  border-color: #c1122f;
+  box-shadow: 0 0 0 3px rgba(193, 18, 47, 0.2);
+}
+
+button {
+  background: linear-gradient(135deg, #ef233c 0%, #b00020 100%);
+  color: #ffffff;
+  border: none;
+  cursor: pointer;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  box-shadow: 0 8px 18px rgba(176, 0, 32, 0.3);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 20px rgba(176, 0, 32, 0.38);
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px 14px;
+}
+
+.form-grid button {
+  grid-column: span 2;
+  margin-top: 6px;
+}
+
+.plan-list {
+  list-style: none;
+  padding-left: 0;
+  margin: 0;
+}
+
+.plan-list li {
+  margin-bottom: 9px;
+}
+
+.plan-list a {
+  display: block;
+  text-decoration: none;
+  color: #8b0018;
+  background: #fff5f7;
+  border: 1px solid #f1cbd2;
+  border-radius: 10px;
+  padding: 10px;
+  font-weight: 600;
+}
+
+.plan-list a:hover {
+  background: #ffeef1;
+}
+
+.kpis {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 9px;
+  margin: 12px 0 20px;
+}
+
+.kpis div {
+  background: linear-gradient(180deg, #fff2f4 0%, #ffe9ed 100%);
+  padding: 10px;
+  border-radius: 10px;
+  border: 1px solid #f2ced6;
+}
+
+.kpis span {
+  display: block;
+  color: #8a4a57;
+  font-size: 11px;
+  margin-bottom: 2px;
+}
+
+.kpis strong {
+  font-size: 15px;
+  color: #8b0018;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+th,
+td {
+  border: 1px solid #f1d3d9;
+  padding: 8px;
+  font-size: 12.5px;
+  text-align: right;
+}
+
+th {
+  background: #c1122f;
+  color: #ffffff;
+}
+
+tr:nth-child(even) td {
+  background: #fff7f9;
+}
+
+th:first-child,
+td:first-child {
+  text-align: center;
+}
+
+.flash {
+  background: #ffeff2;
+  border: 1px solid #f6c2cc;
+  color: #8b0018;
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin-bottom: 12px;
+}
+
+@media (max-width: 980px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+  .form-grid button {
+    grid-column: span 1;
+  }
+  .kpis {
+    grid-template-columns: 1fr 1fr;
+  }
+}
