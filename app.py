@@ -10,7 +10,7 @@ from finance import build_schedule
 
 
 app = Flask(__name__)
-app.secret_key = os.environ.get("SECRET_KEY", "creditcar-dev-secret")
+app.secret_key = os.environ.get("SECRET_KEY", "financuota-dev-secret")
 init_db()
 
 
