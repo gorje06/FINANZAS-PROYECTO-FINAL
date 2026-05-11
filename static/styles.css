@@ -11,38 +11,60 @@ body {
 }
 
 .topbar {
-  display: flex;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
   align-items: center;
-  padding: 16px 24px;
+  padding: 6px 18px 8px;
   color: #ffffff;
-  background: linear-gradient(120deg, #8b0018 0%, #c1122f 100%);
-  box-shadow: 0 8px 26px rgba(139, 0, 24, 0.3);
+  background: linear-gradient(118deg, #6d0012 0%, #9e001c 42%, #d91c3a 100%);
+  box-shadow: 0 3px 12px rgba(109, 0, 18, 0.28);
+}
+
+.topbar-slot--end {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  min-width: 0;
 }
 
 .topbar h1 {
   margin: 0;
-  font-size: 22px;
-  letter-spacing: 0.3px;
+  font-size: inherit;
+  letter-spacing: 0.02em;
 }
 
 .brand {
   display: flex;
+  flex-direction: row;
   align-items: center;
+  justify-content: center;
   gap: 12px;
+  text-align: left;
+  grid-column: 2;
+  justify-self: center;
 }
 
-.brand img {
-  height: 42px;
-  width: auto;
-  border-radius: 8px;
+.brand-logo {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 0;
 }
 
-.brand span {
-  display: inline;
-  font-size: 20px;
-  font-weight: 700;
+.brand-logo img {
+  height: 96px;
+  width: 96px;
+  object-fit: contain;
+  display: block;
+}
+
+.brand-title {
+  display: block;
+  font-size: clamp(1.5rem, 4vw, 2.25rem);
+  font-weight: 800;
   color: #ffffff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.18);
+  line-height: 1.1;
 }
 
 .topbar a {
@@ -63,6 +85,17 @@ body {
   max-width: 1220px;
   margin: 0 auto;
   padding: 24px 20px 40px;
+}
+
+.dni-badge {
+  margin: 0 0 16px;
+  padding: 10px 14px;
+  display: inline-block;
+  font-size: 14px;
+  color: #5c2834;
+  background: linear-gradient(180deg, #fff5f7 0%, #ffecef 100%);
+  border: 1px solid #f1ccd3;
+  border-radius: 12px;
 }
 
 .grid {
@@ -88,6 +121,25 @@ body {
 .auth {
   max-width: 420px;
   margin: 32px auto;
+}
+
+.auth-checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 4px 0 14px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #6a2231;
+  cursor: pointer;
+  user-select: none;
+}
+
+.auth-checkbox-row input[type="checkbox"] {
+  width: auto;
+  margin: 0;
+  flex-shrink: 0;
+  accent-color: #c1122f;
 }
 
 label {
@@ -145,7 +197,123 @@ button:hover {
   margin-top: 6px;
 }
 
-.plan-list {
+.help-formulas {
+  grid-column: span 2;
+  margin: 4px 0 8px;
+  border: 1px solid #e8bcc4;
+  border-radius: 14px;
+  background: linear-gradient(165deg, #fffafc 0%, #fff5f7 100%);
+  overflow: hidden;
+}
+
+.help-formulas summary {
+  cursor: pointer;
+  padding: 12px 14px;
+  font-weight: 600;
+  color: #7a1528;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.help-formulas summary::-webkit-details-marker {
+  display: none;
+}
+
+.help-formulas summary::before {
+  content: "▸";
+  font-size: 0.85em;
+  opacity: 0.7;
+  transition: transform 0.2s ease;
+}
+
+.help-formulas[open] summary::before {
+  transform: rotate(90deg);
+}
+
+.help-formulas summary:hover {
+  background: rgba(193, 18, 47, 0.06);
+}
+
+.formula-panel {
+  padding: 0 16px 16px;
+  border-top: 1px solid #f0d5dc;
+}
+
+.formula-title {
+  margin: 14px 0 8px;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #9a4a5c;
+}
+
+.formula-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: center;
+  gap: 10px 14px;
+  padding: 14px 16px;
+  margin: 0 0 10px;
+  font-family: "Cambria Math", "Palatino Linotype", "Book Antiqua", Palatino, Georgia, serif;
+  font-size: 1.35rem;
+  line-height: 1.35;
+  color: #4a1520;
+  background: #ffffff;
+  border-radius: 12px;
+  border: 1px solid #edd0d6;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+.formula-main {
+  font-weight: 500;
+}
+
+.formula-eq {
+  color: #c1122f;
+  font-weight: 700;
+  margin: 0 2px;
+}
+
+.formula-sup {
+  font-size: 0.72em;
+  font-weight: 600;
+  vertical-align: super;
+  margin-left: 1px;
+}
+
+.formula-fraction {
+  display: inline-block;
+  text-align: center;
+  vertical-align: middle;
+  line-height: 1.1;
+  padding: 0 2px;
+}
+
+.formula-fraction i {
+  font-style: italic;
+}
+
+.formula-note {
+  margin: 0 0 4px;
+  font-size: 13px;
+  color: #6a3d4a;
+  line-height: 1.45;
+}
+
+.credito-meta {
+  margin: 10px 0 14px;
+  padding: 12px 14px;
+  background: linear-gradient(180deg, #fff8f9 0%, #fff0f3 100%);
+  border-radius: 12px;
+  border: 1px solid #f1ccd3;
+  font-size: 14px;
+  line-height: 1.5;
+  color: #4a1a24;
+}
   list-style: none;
   padding-left: 0;
   margin: 0;

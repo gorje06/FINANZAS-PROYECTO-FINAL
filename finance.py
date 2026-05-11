@@ -1,3 +1,7 @@
+"""
+Motor financiero: conversión a TEM, método francés, gracias, VAN, TIR y TCEA.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -29,33 +33,44 @@ class LoanResult:
 
 
 def calcular_tasa_efectiva_mensual(
-    tipo_tasa: str, tasa: float, capitalizacion: int | None = None
+    tipo_tasa: str,
+    tasa: float,
+    capitalizacion: int | None = None,
+    periodo_tasa: int = 7,
 ) -> float:
-    """
-    Cap. 4.1: Conversion de tasa (efectiva/nominal) a TEM.
-    tasa se espera en decimal (ej. 0.125 para 12.5%).
-    """
+    """Conversión de tasa efectiva (por periodo) o nominal a TEM mensual."""
     if tasa <= 0:
         raise ValueError("La tasa debe ser mayor a 0.")
 
     tipo = tipo_tasa.lower().strip()
     if tipo == "efectiva":
-        tea = tasa
-    elif tipo == "nominal":
+        p = periodo_tasa
+        if p == 0:
+            return (1 + tasa) ** 30 - 1
+        if p == 1:
+            return (1 + tasa) ** 2 - 1
+        if p == 2:
+            return tasa
+        if p == 3:
+            return (1 + tasa) ** (1 / 2) - 1
+        if p == 4:
+            return (1 + tasa) ** (1 / 3) - 1
+        if p == 5:
+            return (1 + tasa) ** (1 / 4) - 1
+        if p == 6:
+            return (1 + tasa) ** (1 / 6) - 1
+        return (1 + tasa) ** (1 / 12) - 1
+    if tipo == "nominal":
         c = capitalizacion or 12
         if c <= 0:
             raise ValueError("La capitalizacion debe ser mayor a 0.")
         tea = (1 + tasa / c) ** c - 1
-    else:
-        raise ValueError("tipo_tasa debe ser 'Efectiva' o 'Nominal'.")
-
-    return (1 + tea) ** (1 / 12) - 1
+        return (1 + tea) ** (1 / 12) - 1
+    raise ValueError("tipo_tasa debe ser 'Efectiva' o 'Nominal'.")
 
 
 def calcular_capital_financiado(precio_vehiculo: float, cuota_inicial_pct: float) -> float:
-    """
-    Cap. 4.2: Capital financiado.
-    """
+    """Capital financiado = precio menos cuota inicial (%)."""
     if precio_vehiculo <= 0:
         raise ValueError("El precio del vehiculo debe ser mayor a 0.")
     if not (0 <= cuota_inicial_pct < 100):
@@ -66,9 +81,7 @@ def calcular_capital_financiado(precio_vehiculo: float, cuota_inicial_pct: float
 
 
 def calcular_cuota_base_metodo_frances(capital_financiado: float, tem: float, n: int) -> float:
-    """
-    Cap. 4.3: Cuota base del metodo frances.
-    """
+    """Cuota fija del método francés (antes de seguros y portes)."""
     if n <= 0:
         raise ValueError("El plazo debe ser mayor a 0.")
     if tem == 0:
@@ -77,39 +90,29 @@ def calcular_cuota_base_metodo_frances(capital_financiado: float, tem: float, n:
 
 
 def calcular_interes_periodo_k(saldo_inicio_periodo: float, tem: float) -> float:
-    """
-    Cap. 4.4: Interes del periodo k.
-    """
+    """Interés del periodo sobre saldo al inicio del mes."""
     return saldo_inicio_periodo * tem
 
 
 def calcular_amortizacion_periodo_k(cuota_base: float, interes_periodo: float) -> float:
-    """
-    Cap. 4.5: Amortizacion del periodo k.
-    """
+    """Parte de la cuota que reduce capital."""
     return cuota_base - interes_periodo
 
 
 def calcular_capital_vivo_final(saldo_inicio_periodo: float, amortizacion_periodo: float) -> float:
-    """
-    Cap. 4.6: Capital vivo al final del periodo k.
-    """
+    """Saldo al cierre del periodo tras amortizar."""
     return max(saldo_inicio_periodo - amortizacion_periodo, 0.0)
 
 
 def calcular_cuota_total_periodo_k(
     cuota_base: float, seguro_periodo: float, portes: float
 ) -> float:
-    """
-    Cap. 4.7: Cuota total del periodo k.
-    """
+    """Cuota total del mes: cuota base + seguros + portes."""
     return cuota_base + seguro_periodo + portes
 
 
 def calcular_van(rate: float, flows: List[float]) -> float:
-    """
-    Cap. 4.8: VAN.
-    """
+    """Valor actual neto de los flujos (índice t desde 0)."""
     total = 0.0
     for idx, f in enumerate(flows):
         total += f / ((1 + rate) ** idx)
@@ -118,7 +121,8 @@ def calcular_van(rate: float, flows: List[float]) -> float:
 
 def calcular_tir(flows: List[float], guess: float = 0.01) -> float:
     """
-    Cap. 4.9: TIR (mensual), via Newton-Raphson + biseccion.
+    Tasa interna de retorno mensual: tasa tal que el VAN de los flujos sea cero.
+    Se obtiene por método numérico (Newton y refuerzo por bisección).
     """
     rate = guess
     for _ in range(200):
@@ -150,9 +154,7 @@ def calcular_tir(flows: List[float], guess: float = 0.01) -> float:
 
 
 def calcular_tcea_desde_tir_mensual(tir_mensual: float) -> float:
-    """
-    Cap. 4.10: TCEA desde tasa mensual equivalente.
-    """
+    """TCEA anual a partir de la TIR mensual equivalente."""
     return (1 + tir_mensual) ** 12 - 1 if tir_mensual > -1 else math.nan
 
 
@@ -168,6 +170,7 @@ def build_schedule(
     seguro_vehicular: float,
     portes: float,
     capitalizacion: int | None = None,
+    periodo_tasa: int = 7,
 ) -> LoanResult:
     if plazo_meses <= 0:
         raise ValueError("El plazo debe ser mayor a 0.")
@@ -178,8 +181,10 @@ def build_schedule(
     saldo = calcular_capital_financiado(precio_vehiculo, cuota_inicial_pct)
     saldo_inicial = saldo
 
-    # 4.1 Conversion a TEM
-    tem = calcular_tasa_efectiva_mensual(tipo_tasa, tasa_interes, capitalizacion)
+    # TEM
+    tem = calcular_tasa_efectiva_mensual(
+        tipo_tasa, tasa_interes, capitalizacion, periodo_tasa=periodo_tasa
+    )
     gracia = (periodo_gracia or "Ninguno").lower().strip()
     n_regular = plazo_meses - meses_gracia
     # 4.3 Cuota base
@@ -221,7 +226,7 @@ def build_schedule(
         )
         flows.append(cuota)
 
-    # 4.8 VAN, 4.9 TIR, 4.10 TCEA
+    # VAN, TIR, TCEA
     van = calcular_van(tem, flows)
     tir_mensual = calcular_tir(flows)
     tcea = calcular_tcea_desde_tir_mensual(tir_mensual)

@@ -4,9 +4,23 @@
   <h2>Iniciar sesión</h2>
   <form method="post">
     <label>Usuario <input name="username" required /></label>
-    <label>Contraseña <input name="password" type="password" required /></label>
+    <label>Contraseña <input id="login_password" name="password" type="password" required /></label>
+    <label class="auth-checkbox-row">
+      <input type="checkbox" id="login_show_password" />
+      Mostrar contraseña
+    </label>
     <button type="submit">Ingresar</button>
   </form>
   <p>¿No tienes cuenta? <a href="{{ url_for('register') }}">Regístrate</a></p>
+  <script>
+    (function () {
+      var cb = document.getElementById("login_show_password");
+      var pw = document.getElementById("login_password");
+      if (!cb || !pw) return;
+      cb.addEventListener("change", function () {
+        pw.type = cb.checked ? "text" : "password";
+      });
+    })();
+  </script>
 </section>
 {% endblock %}

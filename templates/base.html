@@ -1,4 +1,5 @@
 <!doctype html>
+<!-- FinanCuota · gorje -->
 <html lang="es">
   <head>
     <meta charset="utf-8" />
@@ -8,13 +9,23 @@
   </head>
   <body>
     <header class="topbar">
+      <div class="topbar-slot" aria-hidden="true"></div>
       <h1 class="brand">
-        <img src="{{ url_for('static', filename='logo-financuota.svg') }}" alt="FinanCuota logo" />
-        <span>FinanCuota</span>
+        <span class="brand-logo" aria-hidden="true">
+          <img
+            src="{{ url_for('static', filename='financuota-logo-informe-upc.png') }}"
+            alt=""
+            width="96"
+            height="96"
+          />
+        </span>
+        <span class="brand-title">FinanCuota</span>
       </h1>
-      {% if session.get("user_id") %}
-      <a href="{{ url_for('logout') }}">Cerrar sesión</a>
-      {% endif %}
+      <div class="topbar-slot topbar-slot--end">
+        {% if session.get("user_id") %}
+        <a href="{{ url_for('logout') }}">Cerrar sesión</a>
+        {% endif %}
+      </div>
     </header>
     <main class="container">
       {% with messages = get_flashed_messages() %}

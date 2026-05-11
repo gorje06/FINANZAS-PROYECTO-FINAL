@@ -1,13 +1,15 @@
 {% extends "base.html" %}
 {% block content %}
 <h2>Hola, {{ username }}</h2>
+{% if dni_cuenta %}
+<p class="dni-badge">DNI de tu cuenta: <strong>{{ dni_cuenta }}</strong></p>
+{% endif %}
 <section class="grid">
   <article class="card">
     <h3>Nuevo plan de crédito</h3>
     <form method="post" class="form-grid">
       <label>Nombres<input name="nombres_cliente" required /></label>
       <label>Apellidos<input name="apellidos_cliente" required /></label>
-      <label>DNI<input name="dni_cliente" maxlength="8" required /></label>
       <label>Correo<input name="correo_cliente" type="email" /></label>
       <label>Teléfono<input name="telefono_cliente" maxlength="9" /></label>
       <label>Dirección<input name="direccion_cliente" /></label>
@@ -24,15 +26,50 @@
           <option>Dólares</option>
         </select>
       </label>
-      <label>Tipo tasa
-        <select name="tipo_tasa">
+      <label>Tipo de tasa
+        <select name="tipo_tasa" id="tipo_tasa">
           <option>Efectiva</option>
           <option>Nominal</option>
         </select>
       </label>
-      <label>Tasa interés anual (%)<input name="tasa_interes" type="number" step="0.0001" required /></label>
-      <label>Capitalización (si nominal)<input name="capitalizacion" type="number" step="1" value="12" /></label>
+      <label id="wrap_periodo_tasa">¿En qué plazo viene tu tasa efectiva?
+        <select name="periodo_tasa">
+          <option value="0">Base 360 días</option>
+          <option value="1">Cada dos meses</option>
+          <option value="2">Mensual (ya es tasa al mes)</option>
+          <option value="3">Semestral</option>
+          <option value="4">Cuatrimestral</option>
+          <option value="5">Trimestral</option>
+          <option value="6">Bimestral</option>
+          <option value="7" selected>Anual (lo más habitual)</option>
+        </select>
+      </label>
+      <label>Porcentaje de la tasa (%)<input name="tasa_interes" type="number" step="0.0001" required placeholder="Ej. 12.5" /></label>
+      <label id="wrap_capitalizacion">Capitalizaciones al año (solo nominal)
+        <input name="capitalizacion" type="number" step="1" min="1" value="12" placeholder="12 = mensual" />
+      </label>
+
+      <details class="help-formulas">
+        <summary>Cómo convertimos la tasa a mensual (TEM)</summary>
+        <div class="formula-panel">
+          <p class="formula-title">Tasa efectiva anual → mensual</p>
+          <div class="formula-row" aria-label="TEM igual a raíz duodécima de uno más TEA menos uno">
+            <span class="formula-main">TEM</span>
+            <span class="formula-eq">=</span>
+            <span class="formula-main">(1 + TEA)<sup class="formula-sup">1⁄12</sup> − 1</span>
+          </div>
+          <p class="formula-note">Usa la opción <strong>Anual</strong> arriba cuando el banco te dé la TEA (ej. 12,5&nbsp;% al año).</p>
+          <p class="formula-title">Tasa nominal → primero TEA, luego mensual</p>
+          <div class="formula-row">
+            <span class="formula-main">TEA</span>
+            <span class="formula-eq">=</span>
+            <span class="formula-main">(1 + <span class="formula-fraction"><i>i</i>⁄<i>m</i></span>)<sup><i>m</i></sup> − 1</span>
+          </div>
+          <p class="formula-note"><i>i</i> = tasa nominal anual en decimal; <i>m</i> = veces que capitaliza al año (12 si es mensual).</p>
+        </div>
+      </details>
       <label>Plazo (meses)<input name="plazo_meses" type="number" step="1" value="48" required /></label>
+      <label>Fecha de desembolso<input name="fecha_desembolso" type="date" required /></label>
 
       <label>Periodo de gracia
         <select name="periodo_gracia">
@@ -48,6 +85,21 @@
 
       <button type="submit">Generar plan</button>
     </form>
+    <script>
+      (function () {
+        var tipo = document.getElementById("tipo_tasa");
+        var wrapP = document.getElementById("wrap_periodo_tasa");
+        var wrapC = document.getElementById("wrap_capitalizacion");
+        function sync() {
+          if (!tipo || !wrapP || !wrapC) return;
+          var nom = tipo.value === "Nominal";
+          wrapP.style.display = nom ? "none" : "";
+          wrapC.style.display = nom ? "" : "none";
+        }
+        tipo.addEventListener("change", sync);
+        sync();
+      })();
+    </script>
   </article>
 
   <article class="card">
@@ -56,8 +108,8 @@
       <ul class="plan-list">
         {% for plan in plans %}
           <li>
-            <a href="{{ url_for('plan_detail', plan_id=plan.id) }}">
-              #{{ plan.id }} - {{ plan.nombres_cliente }} {{ plan.apellidos_cliente }} | {{ plan.marca_vehiculo }} {{ plan.modelo_vehiculo }}
+            <a href="{{ url_for('plan_detail', credito_id=plan.id) }}">
+              #{{ plan.id }} - {{ plan.nombre_cliente }} {{ plan.apellido_cliente }} | {{ plan.marca_vehiculo }} {{ plan.modelo_vehiculo }}
             </a>
           </li>
         {% endfor %}

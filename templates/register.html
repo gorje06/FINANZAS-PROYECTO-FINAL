@@ -3,10 +3,29 @@
 <section class="card auth">
   <h2>Registro</h2>
   <form method="post">
-    <label>Usuario <input name="username" required /></label>
-    <label>Contraseña <input name="password" type="password" required /></label>
+    <label>Usuario <input name="username" autocomplete="username" minlength="3" maxlength="50" required /></label>
+    <label>DNI (8 dígitos) <input name="dni_usuario" inputmode="numeric" pattern="\d{8}" maxlength="8" minlength="8" required /></label>
+    <label>Contraseña <input id="reg_password" name="password" type="password" autocomplete="new-password" minlength="6" required /></label>
+    <label>Repetir contraseña <input id="reg_password_confirm" name="password_confirm" type="password" autocomplete="new-password" minlength="6" required /></label>
+    <label class="auth-checkbox-row">
+      <input type="checkbox" id="reg_show_password" />
+      Mostrar contraseñas
+    </label>
     <button type="submit">Crear cuenta</button>
   </form>
   <p>¿Ya tienes cuenta? <a href="{{ url_for('login') }}">Inicia sesión</a></p>
+  <script>
+    (function () {
+      var cb = document.getElementById("reg_show_password");
+      var a = document.getElementById("reg_password");
+      var b = document.getElementById("reg_password_confirm");
+      if (!cb || !a || !b) return;
+      cb.addEventListener("change", function () {
+        var t = cb.checked ? "text" : "password";
+        a.type = t;
+        b.type = t;
+      });
+    })();
+  </script>
 </section>
 {% endblock %}

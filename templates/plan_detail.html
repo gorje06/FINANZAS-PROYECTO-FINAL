@@ -1,10 +1,20 @@
 {% extends "base.html" %}
 {% block content %}
 <section class="card">
-  <h2>Detalle del plan #{{ plan.id }}</h2>
-  <p><b>Cliente:</b> {{ plan.nombres_cliente }} {{ plan.apellidos_cliente }} - DNI {{ plan.dni_cliente }}</p>
+  <h2>Detalle del crédito #{{ plan.id_credito }}</h2>
+  <p><b>Cliente:</b> {{ plan.nombre_cliente }} {{ plan.apellido_cliente }} - DNI {{ plan.dni_cliente }}</p>
   <p><b>Vehículo:</b> {{ plan.marca_vehiculo }} {{ plan.modelo_vehiculo }}</p>
+  <p><b>Fecha de desembolso:</b> {{ plan.fecha_desembolso }}</p>
   <p><b>Capital financiado:</b> {{ "%.2f"|format(plan.total_financiado) }} {{ plan.moneda }}</p>
+  <p class="credito-meta">
+    <b>Condición de la tasa:</b>
+    {% if plan.tipo_tasa == 'Efectiva' %}
+      efectiva · {{ periodo_tasa_etiqueta }}
+    {% else %}
+      nominal · capitalización {{ capitalizacion_etiqueta }}
+    {% endif %}
+    · <b>Tasa ingresada:</b> {{ "%.4f"|format(plan.tasa_interes * 100) }}%
+  </p>
 
   <div class="kpis">
     <div><span>TEM</span><strong>{{ "%.4f"|format(plan.tem * 100) }}%</strong></div>
