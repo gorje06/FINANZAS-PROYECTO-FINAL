@@ -1,133 +1,91 @@
 ================================================================================
-  FINANCUOTA — Subir a Render SIN tarjeta y SIN cambiar SQLite
+  FINANCUOTA — Render GRATIS + Turso (BD que NO se borra)
 ================================================================================
 
-IMPORTANTE (lee esto primero)
------------------------------
-- El motor sigue siendo SQLite (financuota.db). No se cambia a Postgres ni Turso.
-- En tu PC la BD NO se borra: queda en la carpeta del proyecto.
-- En Render GRATIS la BD del servidor es TEMPORAL: si Render reinicia o
-  redeploya, puedes perder usuarios/simulaciones creados en la web.
-- Para la expo: usa tu PC (run-local.bat) como demo principal con datos reales.
-- Usa Render como enlace publico de respaldo.
+Render free = app en la nube (gratis)
+Turso free    = SQLite persistente (gratis, sin tarjeta)
 
-YO (el asistente) NO puedo controlar tu PC ni tu cuenta de Render.
-Tu solo copias estos pasos. Tarda unos 10 minutos.
+Sigue siendo SQLite. No es Postgres.
 
 
 ================================================================================
-  PARTE 1 — LOCAL (BD permanente, recomendado para presentar)
+  PASO 1 — Crear base en Turso (5 min)
 ================================================================================
 
-1. Doble clic en:  run-local.bat
-2. Abre el navegador: http://127.0.0.1:5000
-3. Admin: usuario admin  |  contrasena adminupc
-
-La base de datos queda en: financuota.db (misma carpeta del proyecto).
-
-
-================================================================================
-  PARTE 2 — RENDER sin Blueprint y sin tarjeta
-================================================================================
-
-PASO 1: Cuenta
---------------
-1. Entra a https://dashboard.render.com
-2. Registrate con GitHub (no pide tarjeta en plan Free)
-
-
-PASO 2: Web Service (NO elijas Blueprint)
----------------------------------------
-1. Clic en "New +"  ->  "Web Service"
-2. Conecta el repo: gorje06/FINANZAS-PROYECTO-FINAL
-3. Si no aparece, dale permiso a Render en GitHub Settings.
-
-
-PASO 3: Configuracion del servicio
-----------------------------------
-Name:              financuota   (o el que quieras)
-Region:            Oregon (US West) o el mas cercano
-Branch:            main
-Runtime:           Python 3
-Build Command:     pip install -r requirements.txt
-Start Command:     gunicorn --bind 0.0.0.0:$PORT app:app
-Instance Type:     Free   <-- importante
-
-
-PASO 4: Variables de entorno (Environment)
-----------------------------------------
-Clic en "Advanced" -> "Add Environment Variable"
-
-  SECRET_KEY  =  (clic en "Generate" o pon una clave larga aleatoria)
-
-NO agregues FINANCUOTA_DB_PATH
-NO agregues disco persistente (Disk) — eso pide tarjeta
-
-
-PASO 5: Crear
--------------
-Clic en "Create Web Service"
-Espera 3-5 minutos hasta que diga "Live".
-
-
-PASO 6: Probar
---------------
-URL ejemplo: https://financuota-xxxx.onrender.com
-
-- La primera vez puede tardar 30-60 seg (plan free "despierta").
-- Login admin: admin / adminupc
-- Crea usuarios y simulaciones para probar.
+1. Entra a https://turso.tech
+2. Sign up con GitHub
+3. Create Database -> nombre: financuota
+4. En la base, abre "Connect" o "Database URL"
+5. Copia y guarda:
+   - Database URL  (ej: libsql://financuota-xxxx.turso.io)
+   - Auth Token    (Create Token si hace falta)
 
 
 ================================================================================
-  PARTE 3 — Actualizar Render cuando cambies el codigo
+  PASO 2 — Render: variables de entorno
 ================================================================================
 
-En PowerShell, en la carpeta del proyecto:
+1. https://dashboard.render.com -> tu servicio financuota
+2. Environment -> Add Environment Variable
 
-  cd "c:\Users\jorge\Downloads\finanzas sistema"
-  git add .
-  git commit -m "actualizacion"
-  git push origin main
+   TURSO_DATABASE_URL = libsql://financuota-xxxx.turso.io
+   TURSO_AUTH_TOKEN   = eyJ... (tu token)
+   SECRET_KEY         = (generar si no existe)
 
-Render redeploya solo al detectar el push en main.
+3. NO uses FINANCUOTA_DB_PATH en Render con Turso.
 
-
-================================================================================
-  PARTE 4 — Checklist dia de la expo
-================================================================================
-
-[ ] Probar run-local.bat en tu laptop (demo principal)
-[ ] Tener cargados Caso 1 Carlos y Caso 2 Maria en local
-[ ] Abrir Render 5 min antes por si esta "dormido"
-[ ] En Render volver a crear admin si la BD se reinicio
-[ ] Tener el repo GitHub abierto por si preguntan por el codigo
+4. Manual Deploy -> Deploy latest commit
+5. Espera "Live"
 
 
 ================================================================================
-  Credenciales por defecto
+  PASO 3 — Probar que la BD persiste
 ================================================================================
 
-Admin:
-  Usuario:    admin
-  Contrasena: adminupc
-
-(Cambiala en Configuracion despues de entrar si quieres.)
+1. Abre tu URL de Render
+2. Login admin / adminupc
+3. Crea un usuario o simulacion
+4. En Render: Manual Deploy otra vez
+5. Si el usuario sigue -> BD persistente OK
 
 
 ================================================================================
-  Preguntas frecuentes
+  PASO 4 — Exportar BD (panel admin)
 ================================================================================
 
-P: Por que Render borra datos?
-R: Plan free no guarda archivos en disco de forma permanente. SQLite es un
-   archivo; cuando el contenedor se reinicia, se pierde.
+1. Login como admin
+2. Administracion -> seccion "Base de datos"
+3. Exportar SQL (.sql) -> respaldo completo
+4. En local tambien puedes exportar .db
 
-P: Hay forma gratis de que Render guarde SQLite sin tarjeta?
-R: No en Render. La opcion gratis con SQLite persistente seria otro proveedor
-   o usar tu PC local.
 
-P: El codigo en GitHub ya esta listo?
-R: Si, repo FINANZAS-PROYECTO-FINAL rama main.
+================================================================================
+  Si el servicio no existe aun en Render
+================================================================================
+
+New + -> Web Service
+Repo: gorje06/FINANZAS-PROYECTO-FINAL
+Branch: main
+Build:  pip install -r requirements.txt
+Start:  gunicorn --bind 0.0.0.0:$PORT app:app
+Plan:   Free
+
+Luego agrega las variables Turso del PASO 2.
+
+
+================================================================================
+  Local (sin Turso)
+================================================================================
+
+run-local.bat -> usa financuota.db en la carpeta del proyecto.
+No pongas TURSO_* en tu PC si quieres seguir en local.
+
+
+================================================================================
+  Admin
+================================================================================
+
+Usuario:    admin
+Contrasena: adminupc
 
 ================================================================================

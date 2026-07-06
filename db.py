@@ -2,7 +2,9 @@
 
 import os
 import sqlite3
+from datetime import date
 from pathlib import Path
+from typing import Any
 
 
 _default_db = Path(__file__).resolve().parent / "financuota.db"
@@ -11,12 +13,85 @@ DB_PATH = Path(_env_db).expanduser() if _env_db else _default_db
 if DB_PATH.parent:
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
 
+TURSO_DATABASE_URL = (os.environ.get("TURSO_DATABASE_URL") or "").strip()
+TURSO_AUTH_TOKEN = (os.environ.get("TURSO_AUTH_TOKEN") or "").strip()
+USE_TURSO = bool(TURSO_DATABASE_URL and TURSO_AUTH_TOKEN)
 
-def get_conn() -> sqlite3.Connection:
+
+def database_backend() -> str:
+    return "turso" if USE_TURSO else "local"
+
+
+def get_conn() -> Any:
+    if USE_TURSO:
+        from turso_http import connect_turso
+
+        return connect_turso(TURSO_DATABASE_URL, TURSO_AUTH_TOKEN)
     conn = sqlite3.connect(DB_PATH, check_same_thread=False)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
     return conn
+
+
+def export_database_sql() -> tuple[str, str]:
+    conn = get_conn()
+    try:
+        if hasattr(conn, "iterdump"):
+            sql = "\n".join(conn.iterdump())
+        else:
+            sql = _dump_sql_manual(conn)
+        return sql, f"financuota_backup_{date.today().isoformat()}.sql"
+    finally:
+        conn.close()
+
+
+def export_database_file() -> tuple[bytes | None, str]:
+    if USE_TURSO or not DB_PATH.is_file():
+        return None, ""
+    return DB_PATH.read_bytes(), f"financuota_backup_{date.today().isoformat()}.db"
+
+
+def _dump_sql_manual(conn) -> str:
+    lines = ["PRAGMA foreign_keys=OFF;", "BEGIN TRANSACTION;"]
+    tables = conn.execute(
+        """
+        SELECT name FROM sqlite_master
+        WHERE type='table' AND name NOT LIKE 'sqlite_%'
+        ORDER BY name
+        """
+    ).fetchall()
+    for table_row in tables:
+        name = table_row[0] if not hasattr(table_row, "keys") else table_row["name"]
+        ddl = conn.execute(
+            "SELECT sql FROM sqlite_master WHERE type='table' AND name=?",
+            (name,),
+        ).fetchone()
+        ddl_sql = ddl[0] if ddl else None
+        if ddl_sql:
+            lines.append(f"{ddl_sql};")
+        rows = conn.execute(f"SELECT * FROM {name}").fetchall()
+        if not rows:
+            continue
+        columns = rows[0].keys() if hasattr(rows[0], "keys") else []
+        if not columns:
+            continue
+        col_list = ", ".join(columns)
+        placeholders = ", ".join("?" for _ in columns)
+        for row in rows:
+            values = [row[col] for col in columns]
+            quoted = ", ".join(_sql_literal(v) for v in values)
+            lines.append(f"INSERT INTO {name} ({col_list}) VALUES ({quoted});")
+    lines.append("COMMIT;")
+    return "\n".join(lines)
+
+
+def _sql_literal(value) -> str:
+    if value is None:
+        return "NULL"
+    if isinstance(value, (int, float)):
+        return str(value)
+    escaped = str(value).replace("'", "''")
+    return f"'{escaped}'"
 
 
 def init_db() -> None:
@@ -418,7 +493,7 @@ def _catalogo_row_tuple(item: dict) -> tuple:
     )
 
 
-def _seed_catalogo(conn: sqlite3.Connection) -> None:
+def _seed_catalogo(conn) -> None:
     count = conn.execute("SELECT COUNT(*) AS n FROM catalogo_vehiculo").fetchone()["n"]
     if count:
         return
@@ -434,7 +509,7 @@ def _seed_catalogo(conn: sqlite3.Connection) -> None:
     conn.commit()
 
 
-def _sync_catalogo_data(conn: sqlite3.Connection) -> None:
+def _sync_catalogo_data(conn) -> None:
     """Actualiza precios, fotos y descripciones del catálogo base."""
     for item in CATALOGO_VEHICULOS:
         marca, modelo, anio, variante, categoria, combustible, condicion, descripcion, precio, imagen_url = (

@@ -1,6 +1,4 @@
-# Render — plan FREE (sin tarjeta, sin disco persistente)
-# Usar: New + -> Blueprint, O crear Web Service manual con los mismos valores.
-# La BD SQLite en Render es TEMPORAL en plan free. Para BD permanente usa run-local.bat
+# Render FREE + Turso (SQLite en la nube, gratis, persistente)
 
 services:
   - type: web
@@ -13,3 +11,8 @@ services:
         value: "3.12.0"
       - key: SECRET_KEY
         generateValue: true
+      # Crear en https://turso.tech y pegar en Render -> Environment:
+      # - key: TURSO_DATABASE_URL
+      #   sync: false
+      # - key: TURSO_AUTH_TOKEN
+      #   sync: false

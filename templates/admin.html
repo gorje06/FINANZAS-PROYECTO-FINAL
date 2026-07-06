@@ -37,6 +37,24 @@
   </div>
 </div>
 
+<div class="card animate-in" style="padding:var(--space-5) var(--space-6);margin-bottom:var(--space-6);">
+  <h3 style="margin:0 0 var(--space-2);font-size:var(--text-lg);color:var(--color-primary-900);">Base de datos</h3>
+  <p style="margin:0 0 var(--space-4);font-size:var(--text-sm);color:var(--color-neutral-600);">
+    Motor: <strong>SQLite</strong> —
+    {% if db_backend == 'turso' %}
+    almacenamiento en <strong>Turso</strong> (nube, persistente en Render).
+    {% else %}
+    archivo local <strong>financuota.db</strong>.
+    {% endif %}
+  </p>
+  <div style="display:flex;flex-wrap:wrap;gap:var(--space-3);">
+    <a href="{{ url_for('admin_export_db', format='sql') }}" class="btn btn-accent btn-sm">⬇ Exportar SQL (.sql)</a>
+    {% if db_backend != 'turso' %}
+    <a href="{{ url_for('admin_export_db', format='db') }}" class="btn btn-secondary btn-sm">⬇ Exportar archivo (.db)</a>
+    {% endif %}
+  </div>
+</div>
+
 <div class="card animate-in" style="padding:0;overflow:hidden;margin-bottom:var(--space-6);">
   <div style="padding:var(--space-5) var(--space-6);border-bottom:var(--border-light);">
     <h3 style="margin:0;font-size:var(--text-lg);color:var(--color-primary-900);">Todas las simulaciones</h3>
