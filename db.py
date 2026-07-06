@@ -119,12 +119,13 @@ def init_db() -> None:
             telefono_cliente TEXT,
             direccion_cliente TEXT,
             ingresos_mensuales REAL NOT NULL,
-            UNIQUE (id_usuario),
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (id_usuario) REFERENCES usuario(id_usuario)
         );
 
         CREATE TABLE vehiculo (
             id_vehiculo INTEGER PRIMARY KEY AUTOINCREMENT,
+            id_catalogo INTEGER,
             marca_vehiculo TEXT NOT NULL,
             modelo_vehiculo TEXT NOT NULL,
             precio_vehiculo REAL NOT NULL
@@ -196,9 +197,25 @@ def init_db() -> None:
 
         CREATE INDEX idx_credito_cliente ON credito(id_cliente);
         CREATE INDEX idx_cronograma_credito ON cronograma_pago(id_credito);
+        CREATE INDEX idx_cliente_usuario ON cliente(id_usuario);
         """
         )
         conn.commit()
+
+    _migrate_cliente_schema(conn)
+    _safe_add_column(
+        conn,
+        "vehiculo",
+        "id_catalogo",
+        "ALTER TABLE vehiculo ADD COLUMN id_catalogo INTEGER",
+    )
+    _safe_add_column(
+        conn,
+        "cliente",
+        "created_at",
+        "ALTER TABLE cliente ADD COLUMN created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP",
+    )
+    conn.commit()
 
     if conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='credito'").fetchone():
         credito_migrations = {
@@ -329,6 +346,56 @@ def catalogo_count(conn=None) -> int:
     if own:
         conn.close()
     return count
+
+
+def _migrate_cliente_schema(conn) -> None:
+    """Quita UNIQUE(id_usuario) para permitir varios clientes por vendedor."""
+    if not conn.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='cliente'"
+    ).fetchone():
+        return
+    ddl_row = conn.execute(
+        "SELECT sql FROM sqlite_master WHERE type='table' AND name='cliente'"
+    ).fetchone()
+    if not ddl_row:
+        return
+    ddl = str(_row_value(ddl_row, "sql", 0) or "").upper()
+    if "UNIQUE" not in ddl or "ID_USUARIO" not in ddl:
+        return
+    has_created_at = "created_at" in _table_columns(conn, "cliente")
+    created_select = "created_at" if has_created_at else "CURRENT_TIMESTAMP"
+    conn.executescript(
+        f"""
+        PRAGMA foreign_keys=OFF;
+        CREATE TABLE cliente_migracion (
+            id_cliente INTEGER PRIMARY KEY AUTOINCREMENT,
+            id_usuario INTEGER NOT NULL,
+            nombre_cliente TEXT NOT NULL,
+            apellido_cliente TEXT NOT NULL,
+            dni_cliente CHAR(8) NOT NULL,
+            correo_cliente TEXT,
+            telefono_cliente TEXT,
+            direccion_cliente TEXT,
+            ingresos_mensuales REAL NOT NULL,
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (id_usuario) REFERENCES usuario(id_usuario)
+        );
+        INSERT INTO cliente_migracion (
+            id_cliente, id_usuario, nombre_cliente, apellido_cliente, dni_cliente,
+            correo_cliente, telefono_cliente, direccion_cliente, ingresos_mensuales, created_at
+        )
+        SELECT
+            id_cliente, id_usuario, nombre_cliente, apellido_cliente, dni_cliente,
+            correo_cliente, telefono_cliente, direccion_cliente, ingresos_mensuales,
+            {created_select}
+        FROM cliente;
+        DROP TABLE cliente;
+        ALTER TABLE cliente_migracion RENAME TO cliente;
+        CREATE INDEX IF NOT EXISTS idx_cliente_usuario ON cliente(id_usuario);
+        PRAGMA foreign_keys=ON;
+        """
+    )
+    conn.commit()
 
 
 CATALOGO_VEHICULOS = [

@@ -102,6 +102,7 @@ CASOS_PRUEBA = {
     "carlos": {
         "nombres_cliente": "Carlos",
         "apellidos_cliente": "Ramírez",
+        "dni_cliente": "72859461",
         "correo_cliente": "carlos.ramirez@email.com",
         "telefono_cliente": "987654321",
         "direccion_cliente": "Av. Javier Prado 123, Lima",
@@ -132,6 +133,7 @@ CASOS_PRUEBA = {
     "maria": {
         "nombres_cliente": "María",
         "apellidos_cliente": "López",
+        "dni_cliente": "40987654",
         "correo_cliente": "maria.lopez@email.com",
         "telefono_cliente": "912345678",
         "direccion_cliente": "Calle Los Pinos 456, Arequipa",
@@ -175,6 +177,7 @@ DEFAULTS_KEYS = (
     "portes",
     "nombres_cliente",
     "apellidos_cliente",
+    "dni_cliente",
     "correo_cliente",
     "telefono_cliente",
     "direccion_cliente",
@@ -230,22 +233,16 @@ def _row_get(row, key: str, default=None):
         return default
 
 
-def _get_profile(user_id: int) -> dict:
-    conn = get_conn()
-    row = conn.execute(
-        "SELECT * FROM cliente WHERE id_usuario = ? ORDER BY id_cliente ASC LIMIT 1",
-        (user_id,),
-    ).fetchone()
-    conn.close()
-    if not row:
-        return {}
+def _get_client_defaults() -> dict:
+    stored = session.get("defaults") or {}
     return {
-        "nombres_cliente": row["nombre_cliente"],
-        "apellidos_cliente": row["apellido_cliente"],
-        "correo_cliente": row["correo_cliente"] or "",
-        "telefono_cliente": row["telefono_cliente"] or "",
-        "direccion_cliente": row["direccion_cliente"] or "",
-        "ingresos_mensuales": row["ingresos_mensuales"],
+        "nombres_cliente": stored.get("nombres_cliente", ""),
+        "apellidos_cliente": stored.get("apellidos_cliente", ""),
+        "dni_cliente": stored.get("dni_cliente", ""),
+        "correo_cliente": stored.get("correo_cliente", ""),
+        "telefono_cliente": stored.get("telefono_cliente", ""),
+        "direccion_cliente": stored.get("direccion_cliente", ""),
+        "ingresos_mensuales": stored.get("ingresos_mensuales", ""),
     }
 
 
@@ -270,8 +267,7 @@ def _get_defaults() -> dict:
         "costos_iniciales": 0,
         "tipo_cambio": 3.75,
     }
-    if "user_id" in session:
-        base.update(_get_profile(session["user_id"]))
+    base.update(_get_client_defaults())
     base.update(stored)
     if not base.get("fecha_desembolso"):
         base["fecha_desembolso"] = date.today().isoformat()
@@ -279,30 +275,32 @@ def _get_defaults() -> dict:
 
 
 def _save_profile(user_id: int, form) -> None:
-    dni = (session.get("dni") or "").strip()
-    if not dni:
-        raise ValueError("Tu cuenta no tiene DNI asociado.")
+    del user_id
     nombres = form.get("nombres_cliente", "").strip()[:100]
     apellidos = form.get("apellidos_cliente", "").strip()[:100]
+    dni_cliente = form.get("dni_cliente", "").strip()
     if not nombres or not apellidos:
         raise ValueError("Nombres y apellidos son obligatorios.")
-    ingresos = float(form.get("ingresos_mensuales", 0))
-    if ingresos <= 0:
-        raise ValueError("Los ingresos mensuales deben ser mayores a 0.")
-    conn = get_conn()
-    _upsert_cliente(
-        conn,
-        user_id,
-        nombres,
-        apellidos,
-        dni,
-        form.get("correo_cliente", "").strip()[:150],
-        form.get("telefono_cliente", "").strip()[:20],
-        form.get("direccion_cliente", "").strip()[:200],
-        ingresos,
+    if dni_cliente and not re.fullmatch(r"\d{8}", dni_cliente):
+        raise ValueError("El DNI del cliente debe tener 8 dígitos.")
+    ingresos_raw = form.get("ingresos_mensuales", "").strip()
+    if ingresos_raw:
+        ingresos = float(ingresos_raw)
+        if ingresos <= 0:
+            raise ValueError("Los ingresos mensuales deben ser mayores a 0.")
+    defaults = _get_defaults()
+    defaults.update(
+        {
+            "nombres_cliente": nombres,
+            "apellidos_cliente": apellidos,
+            "dni_cliente": dni_cliente,
+            "correo_cliente": form.get("correo_cliente", "").strip()[:150],
+            "telefono_cliente": form.get("telefono_cliente", "").strip()[:20],
+            "direccion_cliente": form.get("direccion_cliente", "").strip()[:200],
+            "ingresos_mensuales": ingresos_raw,
+        }
     )
-    conn.commit()
-    conn.close()
+    session["defaults"] = defaults
 
 
 def _change_password(user_id: int, current: str, new_pass: str, confirm: str) -> None:
@@ -343,6 +341,7 @@ def _parse_simulation_form(form) -> dict:
     data = {
         "nombres_cliente": form["nombres_cliente"].strip()[:100],
         "apellidos_cliente": form["apellidos_cliente"].strip()[:100],
+        "dni_cliente": form["dni_cliente"].strip(),
         "correo_cliente": form.get("correo_cliente", "").strip()[:150],
         "telefono_cliente": form.get("telefono_cliente", "").strip()[:20],
         "direccion_cliente": form.get("direccion_cliente", "").strip()[:200],
@@ -365,6 +364,7 @@ def _parse_simulation_form(form) -> dict:
         "fecha_desembolso": form.get("fecha_desembolso", "").strip(),
         "modalidad": modalidad,
         "cuota_balon_pct": cuota_balon_pct,
+        "catalogo_id": form.get("catalogo_id", "").strip(),
         "gastos_notariales": float(form.get("gastos_notariales", 0) or 0),
         "gastos_registrales": float(form.get("gastos_registrales", 0) or 0),
         "costos_iniciales": float(form.get("costos_iniciales", 0) or 0),
@@ -372,6 +372,8 @@ def _parse_simulation_form(form) -> dict:
     }
     if not data["nombres_cliente"] or not data["apellidos_cliente"]:
         raise ValueError("Nombres y apellidos son obligatorios.")
+    if not re.fullmatch(r"\d{8}", data["dni_cliente"]):
+        raise ValueError("El DNI del cliente debe tener exactamente 8 dígitos.")
     if data["moneda"] not in ("Soles", "Dólares"):
         raise ValueError("Moneda inválida.")
     if data["tipo_tasa"] not in ("Efectiva", "Nominal"):
@@ -543,37 +545,52 @@ def _list_creditos(id_usuario=None, all_users: bool = False):
     return rows
 
 
-def _upsert_cliente(conn, id_usuario, nombres, apellidos, dni, correo, telefono, direccion, ingresos):
-    row = conn.execute(
-        "SELECT id_cliente FROM cliente WHERE id_usuario = ? ORDER BY id_cliente ASC LIMIT 1",
-        (id_usuario,),
-    ).fetchone()
-    if row:
-        cid = row["id_cliente"]
-        conn.execute(
-            """
-            UPDATE cliente SET nombre_cliente=?, apellido_cliente=?, dni_cliente=?, correo_cliente=?, telefono_cliente=?,
-            direccion_cliente=?, ingresos_mensuales=? WHERE id_cliente=?
-            """,
-            (nombres, apellidos, dni, correo, telefono, direccion, ingresos, cid),
-        )
-        return cid
+def _insert_cliente(conn, id_usuario: int, data: dict) -> int:
     cur = conn.execute(
         """
-        INSERT INTO cliente (id_usuario, nombre_cliente, apellido_cliente, dni_cliente, correo_cliente,
-            telefono_cliente, direccion_cliente, ingresos_mensuales)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO cliente (
+            id_usuario, nombre_cliente, apellido_cliente, dni_cliente, correo_cliente,
+            telefono_cliente, direccion_cliente, ingresos_mensuales
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         """,
-        (id_usuario, nombres, apellidos, dni, correo, telefono, direccion, ingresos),
+        (
+            id_usuario,
+            data["nombres_cliente"],
+            data["apellidos_cliente"],
+            data["dni_cliente"],
+            data["correo_cliente"],
+            data["telefono_cliente"],
+            data["direccion_cliente"],
+            data["ingresos_mensuales"],
+        ),
     )
     return cur.lastrowid
 
 
+def _parse_catalogo_id(raw) -> int | None:
+    if raw in (None, ""):
+        return None
+    try:
+        value = int(raw)
+    except (TypeError, ValueError):
+        return None
+    return value if value > 0 else None
+
+
 def _delete_credito(conn, credito_id: int) -> None:
+    row = conn.execute(
+        "SELECT id_cliente, id_vehiculo FROM credito WHERE id_credito = ?",
+        (credito_id,),
+    ).fetchone()
     conn.execute("DELETE FROM cronograma_pago WHERE id_credito = ?", (credito_id,))
     conn.execute("DELETE FROM indicadores_financieros WHERE id_credito = ?", (credito_id,))
     conn.execute("DELETE FROM seguro WHERE id_credito = ?", (credito_id,))
     conn.execute("DELETE FROM credito WHERE id_credito = ?", (credito_id,))
+    if row:
+        id_cliente = row["id_cliente"]
+        id_vehiculo = row["id_vehiculo"]
+        conn.execute("DELETE FROM cliente WHERE id_cliente = ?", (id_cliente,))
+        conn.execute("DELETE FROM vehiculo WHERE id_vehiculo = ?", (id_vehiculo,))
 
 
 def _credito_access_clause() -> tuple[str, list]:
@@ -613,10 +630,6 @@ def _delete_usuario_completo(target_id: int) -> None:
 
 
 def _create_credito(uid: int, data: dict) -> int:
-    dni_cuenta = (session.get("dni") or "").strip()
-    if not dni_cuenta:
-        raise ValueError("Tu cuenta no tiene DNI asociado. Regístrate de nuevo.")
-
     result = build_schedule(
         precio_vehiculo=data["precio_vehiculo"],
         cuota_inicial_pct=data["cuota_inicial_pct"],
@@ -639,21 +652,12 @@ def _create_credito(uid: int, data: dict) -> int:
 
     conn = get_conn()
     cur = conn.cursor()
-    id_cliente = _upsert_cliente(
-        conn,
-        uid,
-        data["nombres_cliente"],
-        data["apellidos_cliente"],
-        dni_cuenta,
-        data["correo_cliente"],
-        data["telefono_cliente"],
-        data["direccion_cliente"],
-        data["ingresos_mensuales"],
-    )
+    id_cliente = _insert_cliente(conn, uid, data)
+    catalogo_id = _parse_catalogo_id(data.get("catalogo_id"))
 
     cur.execute(
-        "INSERT INTO vehiculo (marca_vehiculo, modelo_vehiculo, precio_vehiculo) VALUES (?, ?, ?)",
-        (data["marca_vehiculo"], data["modelo_vehiculo"], data["precio_vehiculo"]),
+        "INSERT INTO vehiculo (id_catalogo, marca_vehiculo, modelo_vehiculo, precio_vehiculo) VALUES (?, ?, ?, ?)",
+        (catalogo_id, data["marca_vehiculo"], data["modelo_vehiculo"], data["precio_vehiculo"]),
     )
     id_vehiculo = cur.lastrowid
 
@@ -739,12 +743,13 @@ def _persist_credito_result(
 ) -> None:
     conn.execute(
         """
-        UPDATE cliente SET nombre_cliente=?, apellido_cliente=?, correo_cliente=?, telefono_cliente=?,
+        UPDATE cliente SET nombre_cliente=?, apellido_cliente=?, dni_cliente=?, correo_cliente=?, telefono_cliente=?,
             direccion_cliente=?, ingresos_mensuales=? WHERE id_cliente=?
         """,
         (
             data["nombres_cliente"],
             data["apellidos_cliente"],
+            data["dni_cliente"],
             data["correo_cliente"],
             data["telefono_cliente"],
             data["direccion_cliente"],
@@ -753,8 +758,14 @@ def _persist_credito_result(
         ),
     )
     conn.execute(
-        "UPDATE vehiculo SET marca_vehiculo=?, modelo_vehiculo=?, precio_vehiculo=? WHERE id_vehiculo=?",
-        (data["marca_vehiculo"], data["modelo_vehiculo"], data["precio_vehiculo"], id_vehiculo),
+        "UPDATE vehiculo SET id_catalogo=?, marca_vehiculo=?, modelo_vehiculo=?, precio_vehiculo=? WHERE id_vehiculo=?",
+        (
+            _parse_catalogo_id(data.get("catalogo_id")),
+            data["marca_vehiculo"],
+            data["modelo_vehiculo"],
+            data["precio_vehiculo"],
+            id_vehiculo,
+        ),
     )
     conn.execute(
         """
@@ -877,9 +888,9 @@ def _load_credito_defaults(credito_id: int) -> dict | None:
     conn = get_conn()
     row = conn.execute(
         f"""
-        SELECT c.*, cl.nombre_cliente, cl.apellido_cliente, cl.correo_cliente, cl.telefono_cliente,
+        SELECT c.*, cl.nombre_cliente, cl.apellido_cliente, cl.dni_cliente, cl.correo_cliente, cl.telefono_cliente,
                cl.direccion_cliente, cl.ingresos_mensuales,
-               v.marca_vehiculo, v.modelo_vehiculo, v.precio_vehiculo,
+               v.marca_vehiculo, v.modelo_vehiculo, v.precio_vehiculo, v.id_catalogo,
                s.seguro_desgravamen, s.seguro_vehicular, s.portes
         FROM credito c
         JOIN cliente cl ON c.id_cliente = cl.id_cliente
@@ -892,10 +903,13 @@ def _load_credito_defaults(credito_id: int) -> dict | None:
     conn.close()
     if not row:
         return None
-    catalogo_id = _match_catalogo_id(row["marca_vehiculo"], row["modelo_vehiculo"], row["precio_vehiculo"])
+    catalogo_id = row["id_catalogo"] if row["id_catalogo"] else _match_catalogo_id(
+        row["marca_vehiculo"], row["modelo_vehiculo"], row["precio_vehiculo"]
+    )
     return {
         "nombres_cliente": row["nombre_cliente"],
         "apellidos_cliente": row["apellido_cliente"],
+        "dni_cliente": row["dni_cliente"] or "",
         "correo_cliente": row["correo_cliente"] or "",
         "telefono_cliente": row["telefono_cliente"] or "",
         "direccion_cliente": row["direccion_cliente"] or "",
@@ -1240,7 +1254,7 @@ def settings():
         try:
             if action == "profile":
                 _save_profile(session["user_id"], request.form)
-                flash("Perfil actualizado.")
+                flash("Precarga de cliente guardada.")
             elif action == "password":
                 _change_password(
                     session["user_id"],
@@ -1264,7 +1278,7 @@ def settings():
     return render_template(
         "settings.html",
         defaults=_get_defaults(),
-        profile=_get_profile(session["user_id"]),
+        profile=_get_client_defaults(),
         account=user_row,
         active_nav="settings",
     )
