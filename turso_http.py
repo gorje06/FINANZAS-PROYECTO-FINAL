@@ -8,11 +8,20 @@ import urllib.request
 from typing import Any
 
 
+def _normalize_cell(value: Any) -> Any:
+    if isinstance(value, dict):
+        if "value" in value:
+            return value["value"]
+        if "name" in value:
+            return value["name"]
+    return value
+
+
 class TursoRow:
     def __init__(self, keys: list[str], values: list[Any]):
         self._keys = keys
-        self._values = values
-        self._data = dict(zip(keys, values))
+        self._values = [_normalize_cell(v) for v in values]
+        self._data = dict(zip(keys, self._values))
 
     def __getitem__(self, key):
         if isinstance(key, int):

@@ -34,14 +34,22 @@ def get_conn() -> Any:
 
 def _row_value(row, key: str, index: int):
     try:
-        return row[key]
+        raw = row[key]
     except (KeyError, TypeError, IndexError):
-        return row[index]
+        raw = row[index]
+    if isinstance(raw, dict):
+        raw = raw.get("value", raw.get("name"))
+    return raw
 
 
 def _table_columns(conn, table: str) -> set[str]:
     rows = conn.execute(f"PRAGMA table_info({table})").fetchall()
-    return {_row_value(row, "name", 1) for row in rows}
+    cols: set[str] = set()
+    for row in rows:
+        name = _row_value(row, "name", 1)
+        if name is not None:
+            cols.add(str(name))
+    return cols
 
 
 def _safe_add_column(conn, table: str, column: str, sql: str) -> None:
