@@ -32,6 +32,31 @@ def get_conn() -> Any:
     return conn
 
 
+def _row_value(row, key: str, index: int):
+    try:
+        return row[key]
+    except (KeyError, TypeError, IndexError):
+        return row[index]
+
+
+def _table_columns(conn, table: str) -> set[str]:
+    rows = conn.execute(f"PRAGMA table_info({table})").fetchall()
+    return {_row_value(row, "name", 1) for row in rows}
+
+
+def _safe_add_column(conn, table: str, column: str, sql: str) -> None:
+    if column in _table_columns(conn, table):
+        return
+    try:
+        conn.execute(sql)
+    except sqlite3.OperationalError as exc:
+        if "duplicate column" not in str(exc).lower():
+            raise
+    except RuntimeError as exc:
+        if "duplicate column" not in str(exc).lower():
+            raise
+
+
 def init_db() -> None:
     conn = get_conn()
     cur = conn.cursor()
@@ -152,10 +177,7 @@ def init_db() -> None:
         )
         conn.commit()
 
-    cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='credito'")
-    if cur.fetchone():
-        cur.execute("PRAGMA table_info(credito)")
-        cols = [row[1] for row in cur.fetchall()]
+    if conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='credito'").fetchone():
         credito_migrations = {
             "periodo_tasa": "ALTER TABLE credito ADD COLUMN periodo_tasa INTEGER DEFAULT 7",
             "modalidad": "ALTER TABLE credito ADD COLUMN modalidad TEXT DEFAULT 'Convencional'",
@@ -167,32 +189,35 @@ def init_db() -> None:
             "tipo_cambio": "ALTER TABLE credito ADD COLUMN tipo_cambio REAL",
         }
         for col, sql in credito_migrations.items():
-            if col not in cols:
-                cur.execute(sql)
+            _safe_add_column(conn, "credito", col, sql)
         conn.commit()
 
-    cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='cronograma_pago'")
-    if cur.fetchone():
-        cur.execute("PRAGMA table_info(cronograma_pago)")
-        ccols = [row[1] for row in cur.fetchall()]
-        if "cuota_balon" not in ccols:
-            cur.execute("ALTER TABLE cronograma_pago ADD COLUMN cuota_balon REAL DEFAULT 0")
-            conn.commit()
+    if conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='cronograma_pago'").fetchone():
+        _safe_add_column(
+            conn,
+            "cronograma_pago",
+            "cuota_balon",
+            "ALTER TABLE cronograma_pago ADD COLUMN cuota_balon REAL DEFAULT 0",
+        )
+        conn.commit()
 
-    cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='usuario'")
-    if cur.fetchone():
-        cur.execute("PRAGMA table_info(usuario)")
-        ucols = [row[1] for row in cur.fetchall()]
-        if "dni_usuario" not in ucols:
-            cur.execute("ALTER TABLE usuario ADD COLUMN dni_usuario CHAR(8)")
-            conn.commit()
-        if "rol" not in ucols:
-            cur.execute("ALTER TABLE usuario ADD COLUMN rol TEXT NOT NULL DEFAULT 'usuario'")
-            conn.commit()
+    if conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='usuario'").fetchone():
+        _safe_add_column(
+            conn,
+            "usuario",
+            "dni_usuario",
+            "ALTER TABLE usuario ADD COLUMN dni_usuario CHAR(8)",
+        )
+        _safe_add_column(
+            conn,
+            "usuario",
+            "rol",
+            "ALTER TABLE usuario ADD COLUMN rol TEXT NOT NULL DEFAULT 'usuario'",
+        )
+        conn.commit()
 
-    cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='catalogo_vehiculo'")
-    if not cur.fetchone():
-        cur.executescript(
+    if not conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='catalogo_vehiculo'").fetchone():
+        conn.executescript(
             """
             CREATE TABLE catalogo_vehiculo (
                 id_catalogo INTEGER PRIMARY KEY AUTOINCREMENT,
