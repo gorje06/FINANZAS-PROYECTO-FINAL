@@ -24,12 +24,38 @@ def _turso_arg(value: Any) -> dict:
 
 
 def _normalize_cell(value: Any) -> Any:
-    if isinstance(value, dict):
+    if not isinstance(value, dict):
+        return value
+    cell_type = value.get("type")
+    if cell_type is None:
         if "value" in value:
             return value["value"]
         if "name" in value:
             return value["name"]
-    return value
+        return value
+    if cell_type == "null":
+        return None
+    raw = value.get("value")
+    if cell_type == "integer":
+        if raw is None or raw == "":
+            return None
+        try:
+            return int(raw)
+        except (TypeError, ValueError):
+            return raw
+    if cell_type == "float":
+        if raw is None or raw == "":
+            return None
+        try:
+            return float(raw)
+        except (TypeError, ValueError):
+            return raw
+    if cell_type == "blob":
+        encoded = value.get("base64")
+        if encoded:
+            return base64.b64decode(encoded)
+        return raw
+    return "" if raw is None else raw
 
 
 class TursoRow:

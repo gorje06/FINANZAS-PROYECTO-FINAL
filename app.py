@@ -212,6 +212,24 @@ def etiqueta_capitalizacion(valor) -> str:
     return nombres.get(c, f"{c} veces al año")
 
 
+def _num(value, default: float = 0.0) -> float:
+    if value is None or value == "":
+        return default
+    if isinstance(value, (int, float)):
+        return float(value)
+    try:
+        return float(str(value).strip())
+    except (TypeError, ValueError):
+        return default
+
+
+def _row_get(row, key: str, default=None):
+    try:
+        return row[key]
+    except (KeyError, TypeError, IndexError):
+        return default
+
+
 def _get_profile(user_id: int) -> dict:
     conn = get_conn()
     row = conn.execute(
@@ -1378,36 +1396,71 @@ def plan_detail(credito_id: int):
         flash("Crédito no encontrado.")
         return redirect(url_for("dashboard"))
 
-    periodo_tasa = row["periodo_tasa"] if "periodo_tasa" in row.keys() else 7
-    cap = row["capitalizacion"] if "capitalizacion" in row.keys() else None
-    total_pagar = sum(r["cuota_total"] for r in schedule)
-    sym = "S/" if row["moneda"] == "Soles" else "$"
+    periodo_tasa = _row_get(row, "periodo_tasa", 7)
+    cap = _row_get(row, "capitalizacion")
+    total_pagar = sum(_num(r["cuota_total"]) for r in schedule)
+    sym = "S/" if _row_get(row, "moneda") == "Soles" else "$"
 
-    modalidad = row["modalidad"] if "modalidad" in row.keys() and row["modalidad"] else MODALIDAD_CONVENCIONAL
-    cuota_balon_monto = row["cuota_balon_monto"] if "cuota_balon_monto" in row.keys() else 0
-    gastos_not = row["gastos_notariales"] if "gastos_notariales" in row.keys() else 0
-    gastos_reg = row["gastos_registrales"] if "gastos_registrales" in row.keys() else 0
-    costos_ini = row["costos_iniciales"] if "costos_iniciales" in row.keys() else 0
-    tipo_cambio = row["tipo_cambio"] if "tipo_cambio" in row.keys() else None
+    modalidad = _row_get(row, "modalidad") or MODALIDAD_CONVENCIONAL
+    cuota_balon_monto = _num(_row_get(row, "cuota_balon_monto"))
+    gastos_not = _num(_row_get(row, "gastos_notariales"))
+    gastos_reg = _num(_row_get(row, "gastos_registrales"))
+    costos_ini = _num(_row_get(row, "costos_iniciales"))
+    tipo_cambio_raw = _row_get(row, "tipo_cambio")
+    tipo_cambio = _num(tipo_cambio_raw, default=0.0) if tipo_cambio_raw not in (None, "") else None
+
+    plan_view = {
+        "id_credito": _row_get(row, "id_credito"),
+        "nombre_cliente": _row_get(row, "nombre_cliente", ""),
+        "apellido_cliente": _row_get(row, "apellido_cliente", ""),
+        "dni_cliente": _row_get(row, "dni_cliente", ""),
+        "marca_vehiculo": _row_get(row, "marca_vehiculo", ""),
+        "modelo_vehiculo": _row_get(row, "modelo_vehiculo", ""),
+        "moneda": _row_get(row, "moneda", "Soles"),
+        "tipo_tasa": _row_get(row, "tipo_tasa", "Efectiva"),
+        "fecha_desembolso": _row_get(row, "fecha_desembolso", ""),
+        "periodo_gracia": _row_get(row, "periodo_gracia", "Ninguno"),
+        "meses_gracia": _row_get(row, "meses_gracia", 0),
+        "cuota_base": _num(_row_get(row, "cuota_base")),
+        "tasa_interes": _num(_row_get(row, "tasa_interes")),
+        "total_financiado": _num(_row_get(row, "total_financiado")),
+        "tem": _num(_row_get(row, "tem")),
+        "van": _num(_row_get(row, "van")),
+        "tir": _num(_row_get(row, "tir")),
+        "tcea": _num(_row_get(row, "tcea")),
+    }
+    schedule_view = [
+        {
+            "periodo": int(_num(r["periodo"], 0)),
+            "cuota_total": _num(r["cuota_total"]),
+            "interes": _num(r["interes"]),
+            "amortizacion": _num(r["amortizacion"]),
+            "saldo_final": _num(r["saldo_final"]),
+            "seguro": _num(r["seguro"]),
+            "portes": _num(r["portes"]),
+            "cuota_balon": _num(r["cuota_balon"]),
+        }
+        for r in schedule
+    ]
 
     return render_template(
         "plan_detail.html",
-        plan=row,
-        schedule=schedule,
+        plan=plan_view,
+        schedule=schedule_view,
         periodo_tasa_etiqueta=etiqueta_periodo_tasa(periodo_tasa),
         capitalizacion_etiqueta=etiqueta_capitalizacion(cap),
         total_pagar=total_pagar,
         sym=sym,
         modalidad=modalidad,
         cuota_balon_monto=cuota_balon_monto,
-        gastos_totales=(gastos_not or 0) + (gastos_reg or 0) + (costos_ini or 0),
+        gastos_totales=gastos_not + gastos_reg + costos_ini,
         gastos_notariales=gastos_not,
         gastos_registrales=gastos_reg,
         costos_iniciales=costos_ini,
         tipo_cambio=tipo_cambio,
-        chart_labels=[r["periodo"] for r in schedule],
-        chart_intereses=[r["interes"] for r in schedule],
-        chart_amort=[r["amortizacion"] for r in schedule],
+        chart_labels=[r["periodo"] for r in schedule_view],
+        chart_intereses=[r["interes"] for r in schedule_view],
+        chart_amort=[r["amortizacion"] for r in schedule_view],
         active_nav="admin" if _is_admin() else "dashboard",
     )
 
