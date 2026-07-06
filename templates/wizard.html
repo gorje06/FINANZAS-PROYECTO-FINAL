@@ -1,0 +1,215 @@
+{% extends "layout_app.html" %}
+{% from "macros.html" import help_tip %}
+{% block title %}Nueva Simulación — FinanCuota{% endblock %}
+{% block page_title %}Nueva Simulación{% endblock %}
+{% block topbar_actions %}
+<a href="{{ url_for('dashboard') }}" class="btn btn-ghost btn-sm">← Dashboard</a>
+{% endblock %}
+{% block content %}
+<div class="card animate-in" style="padding:var(--space-4) var(--space-6);margin-bottom:var(--space-4);">
+  <p style="margin:0 0 var(--space-3);font-size:var(--text-sm);color:var(--color-neutral-600);">Casos de prueba del informe (cap. 3.4):</p>
+  <div style="display:flex;flex-wrap:wrap;gap:var(--space-3);">
+    <a href="{{ url_for('wizard', caso='carlos') }}" class="btn btn-ghost btn-sm">Caso 1 — Carlos Ramírez (convencional)</a>
+    <a href="{{ url_for('wizard', caso='maria') }}" class="btn btn-ghost btn-sm">Caso 2 — María López (Compra Inteligente)</a>
+  </div>
+</div>
+<div class="card animate-in" style="padding:var(--space-6);">
+  <div class="wizard-stepper">
+    <div class="wizard-step active"><div class="wizard-step-circle">1</div><div class="wizard-step-label">Cliente</div></div>
+    <div class="wizard-step-connector"></div>
+    <div class="wizard-step"><div class="wizard-step-circle">2</div><div class="wizard-step-label">Vehículo</div></div>
+    <div class="wizard-step-connector"></div>
+    <div class="wizard-step"><div class="wizard-step-circle">3</div><div class="wizard-step-label">Crédito</div></div>
+    <div class="wizard-step-connector"></div>
+    <div class="wizard-step"><div class="wizard-step-circle">4</div><div class="wizard-step-label">Costos</div></div>
+  </div>
+
+  <form method="post" id="wizard-form" novalidate>
+    <div class="wizard-panel active" data-step="0">
+      <h3 style="margin-bottom:var(--space-5);color:var(--color-primary-900);">Datos del cliente</h3>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Nombres <span class="required">*</span></label>
+          <input class="form-input" name="nombres_cliente" required value="{{ defaults.get('nombres_cliente','') }}" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Apellidos <span class="required">*</span></label>
+          <input class="form-input" name="apellidos_cliente" required value="{{ defaults.get('apellidos_cliente','') }}" />
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Correo</label>
+          <input class="form-input" name="correo_cliente" type="email" value="{{ defaults.get('correo_cliente','') }}" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Teléfono</label>
+          <input class="form-input" name="telefono_cliente" maxlength="9" value="{{ defaults.get('telefono_cliente','') }}" />
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Dirección</label>
+        <input class="form-input" name="direccion_cliente" value="{{ defaults.get('direccion_cliente','') }}" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Ingresos mensuales <span class="required">*</span> {{ help_tip('Ingreso mensual declarado del cliente en la moneda del crédito.') }}</label>
+        <input class="form-input" name="ingresos_mensuales" type="number" step="0.01" min="0" required value="{{ defaults.get('ingresos_mensuales','') }}" />
+      </div>
+    </div>
+
+    <div class="wizard-panel" data-step="1">
+      <h3 style="margin-bottom:var(--space-5);color:var(--color-primary-900);">Datos del vehículo</h3>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Marca <span class="required">*</span></label>
+          <input class="form-input" name="marca_vehiculo" required value="{{ defaults.get('marca_vehiculo','') }}" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Modelo <span class="required">*</span></label>
+          <input class="form-input" name="modelo_vehiculo" required value="{{ defaults.get('modelo_vehiculo','') }}" />
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Precio del vehículo <span class="required">*</span></label>
+          <input class="form-input" name="precio_vehiculo" type="number" step="0.01" min="0.01" required value="{{ defaults.get('precio_vehiculo','') }}" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Cuota inicial (%) <span class="required">*</span> {{ help_tip('Porcentaje del precio que paga el cliente al inicio. Entre 0 y 99 %.') }}</label>
+          <input class="form-input" name="cuota_inicial_pct" type="number" step="0.01" min="0" max="99" required value="{{ defaults.get('cuota_inicial_pct', 20) }}" />
+        </div>
+      </div>
+    </div>
+
+    <div class="wizard-panel" data-step="2">
+      <h3 style="margin-bottom:var(--space-5);color:var(--color-primary-900);">Condiciones del crédito</h3>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Modalidad {{ help_tip('Convencional: amortiza todo el capital. Compra Inteligente: cuotas más bajas y cuota balón al final (30–50 % del vehículo).') }}</label>
+          <select class="form-select" name="modalidad" id="modalidad">
+            {% for m in modalidades %}
+            <option value="{{ m }}" {% if defaults.get('modalidad', 'Convencional') == m %}selected{% endif %}>{{ m }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Moneda {{ help_tip('Soles o dólares según la operación.') }}</label>
+          <select class="form-select" name="moneda" id="moneda">
+            <option {% if defaults.get('moneda','Soles')=='Soles' %}selected{% endif %}>Soles</option>
+            <option {% if defaults.get('moneda')=='Dólares' %}selected{% endif %}>Dólares</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group" id="wrap_tipo_cambio" style="display:none;">
+        <label class="form-label">Tipo de cambio (S/ por US$) <span class="required">*</span> {{ help_tip('Tipo de cambio de referencia para créditos en dólares.') }}</label>
+        <input class="form-input" name="tipo_cambio" type="number" step="0.0001" min="0.0001" value="{{ defaults.get('tipo_cambio', 3.75) }}" />
+      </div>
+      <div class="form-group" id="wrap_cuota_balon" style="display:none;">
+        <label class="form-label">Cuota balón (%) <span class="required">*</span> {{ help_tip('Porcentaje del valor del vehículo que se paga al final del plazo. Típico: 30 % a 50 %.') }}</label>
+        <input class="form-input" name="cuota_balon_pct" type="number" step="0.01" min="0.01" max="99" value="{{ defaults.get('cuota_balon_pct', 40) }}" />
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Tipo de tasa {{ help_tip('Efectiva: ya es tasa real del periodo. Nominal: requiere capitalización.') }}</label>
+          <select class="form-select" name="tipo_tasa" id="tipo_tasa">
+            <option {% if defaults.get('tipo_tasa','Efectiva')=='Efectiva' %}selected{% endif %}>Efectiva</option>
+            <option {% if defaults.get('tipo_tasa')=='Nominal' %}selected{% endif %}>Nominal</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group" id="wrap_periodo_tasa">
+        <label class="form-label">Periodo de la tasa efectiva {{ help_tip('Anual es lo habitual cuando el banco indica TEA.') }}</label>
+        <select class="form-select" name="periodo_tasa">
+          {% for val, label in periodo_opciones %}
+          <option value="{{ val }}" {% if defaults.get('periodo_tasa', 7)|int == val %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Porcentaje de la tasa (%) <span class="required">*</span> {{ help_tip('Ejemplo: 12.5 para una TEA del 12.5 %.') }}</label>
+          <input class="form-input" name="tasa_interes" type="number" step="0.0001" min="0.0001" required value="{{ defaults.get('tasa_interes','') }}" />
+        </div>
+        <div class="form-group" id="wrap_capitalizacion">
+          <label class="form-label">Capitalizaciones al año (nominal) {{ help_tip('12 = capitalización mensual.') }}</label>
+          <input class="form-input" name="capitalizacion" type="number" step="1" min="1" value="{{ defaults.get('capitalizacion', 12) }}" />
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Plazo (meses) <span class="required">*</span></label>
+          <input class="form-input" name="plazo_meses" type="number" step="1" min="1" max="480" required value="{{ defaults.get('plazo_meses', 48) }}" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Fecha de desembolso <span class="required">*</span></label>
+          <input class="form-input" name="fecha_desembolso" type="date" required value="{{ defaults.get('fecha_desembolso','') }}" />
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Periodo de gracia {{ help_tip('Total: no paga cuota y capitaliza intereses. Parcial: solo intereses.') }}</label>
+          <select class="form-select" name="periodo_gracia">
+            <option {% if defaults.get('periodo_gracia','Ninguno')=='Ninguno' %}selected{% endif %}>Ninguno</option>
+            <option {% if defaults.get('periodo_gracia')=='Parcial' %}selected{% endif %}>Parcial</option>
+            <option {% if defaults.get('periodo_gracia')=='Total' %}selected{% endif %}>Total</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Meses de gracia</label>
+          <input class="form-input" name="meses_gracia" type="number" step="1" min="0" value="{{ defaults.get('meses_gracia', 0) }}" />
+        </div>
+      </div>
+    </div>
+
+    <div class="wizard-panel" data-step="3">
+      <h3 style="margin-bottom:var(--space-5);color:var(--color-primary-900);">Seguros y costos</h3>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Seguro desgravamen mensual (%) {{ help_tip('Tasa mensual aplicada sobre el saldo.') }}</label>
+          <input class="form-input" name="seguro_desgravamen" type="number" step="0.0001" min="0" required value="{{ defaults.get('seguro_desgravamen', 0.03) }}" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Seguro vehicular mensual (%) {{ help_tip('Tasa mensual sobre el saldo del crédito.') }}</label>
+          <input class="form-input" name="seguro_vehicular" type="number" step="0.0001" min="0" required value="{{ defaults.get('seguro_vehicular', 0.025) }}" />
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Portes por cuota {{ help_tip('Gastos administrativos fijos por cada cuota.') }}</label>
+        <input class="form-input" name="portes" type="number" step="0.01" min="0" required value="{{ defaults.get('portes', 4) }}" />
+      </div>
+      <h4 style="margin:var(--space-6) 0 var(--space-4);color:var(--color-primary-800);font-size:var(--text-base);">Gastos notariales y registrales</h4>
+      <p style="font-size:var(--text-sm);color:var(--color-neutral-600);margin-bottom:var(--space-4);">Se financian junto al crédito y aumentan el capital desembolsado (transparencia SBS).</p>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Gastos notariales {{ help_tip('Honorarios notariales por escritura pública.') }}</label>
+          <input class="form-input" name="gastos_notariales" type="number" step="0.01" min="0" required value="{{ defaults.get('gastos_notariales', 0) }}" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Gastos registrales {{ help_tip('Inscripción registral del gravamen vehicular.') }}</label>
+          <input class="form-input" name="gastos_registrales" type="number" step="0.01" min="0" required value="{{ defaults.get('gastos_registrales', 0) }}" />
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Otros costos iniciales {{ help_tip('Evaluación, tramites u otros gastos de desembolso.') }}</label>
+        <input class="form-input" name="costos_iniciales" type="number" step="0.01" min="0" required value="{{ defaults.get('costos_iniciales', 0) }}" />
+      </div>
+    </div>
+
+    <div class="wizard-actions">
+      <button type="button" class="btn btn-secondary" id="wizard-prev">Anterior</button>
+      <div style="display:flex;gap:var(--space-3);">
+        <button type="button" class="btn btn-accent" id="wizard-next">Siguiente</button>
+        <button type="submit" class="btn btn-accent" id="wizard-submit" style="display:none;">Generar simulación</button>
+      </div>
+    </div>
+  </form>
+</div>
+{% endblock %}
+{% block page_scripts %}
+<script src="{{ url_for('static', filename='forms.js') }}"></script>
+<script>
+  bindWizard();
+  syncTipoTasa();
+  syncModalidadCredito();
+</script>
+{% endblock %}

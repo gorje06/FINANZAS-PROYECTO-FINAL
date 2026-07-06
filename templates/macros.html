@@ -1,0 +1,9 @@
+{% macro help_tip(text) %}
+<button type="button" class="help-trigger" tabindex="0" aria-label="Ayuda">?
+  <span class="help-tooltip">{{ text }}</span>
+</button>
+{% endmacro %}
+
+{% macro field_error(id) %}
+<span class="form-error" id="{{ id }}"></span>
+{% endmacro %}

@@ -1,20 +1,65 @@
 """FinanCuota — simulador de crédito vehicular (método francés). Autor: gorje."""
 
+import csv
+import io
 import json
 import os
 import re
+from datetime import date
 from functools import wraps
 
-from flask import Flask, flash, redirect, render_template, request, session, url_for
+from flask import Flask, Response, flash, redirect, render_template, request, session, url_for
 from werkzeug.security import check_password_hash, generate_password_hash
 
-from db import get_conn, init_db
-from finance import build_schedule
+from db import DB_PATH, get_conn, init_db
+from finance import MODALIDAD_COMPRA_INTELIGENTE, MODALIDAD_CONVENCIONAL, build_schedule
 
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "financuota-dev-secret")
+
+ROL_ADMIN = "admin"
+ROL_USUARIO = "usuario"
+ADMIN_LOGIN = "admin"
+ADMIN_PASSWORD = "adminupc"
+ADMIN_DNI = "00000001"
+
 init_db()
+
+
+def _ensure_admin_account() -> None:
+    conn = get_conn()
+    row = conn.execute(
+        "SELECT id_usuario FROM usuario WHERE usuario_login = ?", (ADMIN_LOGIN,)
+    ).fetchone()
+    if not row:
+        conn.execute(
+            """
+            INSERT INTO usuario (usuario_login, password_hash, dni_usuario, rol)
+            VALUES (?, ?, ?, ?)
+            """,
+            (ADMIN_LOGIN, generate_password_hash(ADMIN_PASSWORD), ADMIN_DNI, ROL_ADMIN),
+        )
+        conn.commit()
+    else:
+        conn.execute(
+            "UPDATE usuario SET rol = ? WHERE usuario_login = ?",
+            (ROL_ADMIN, ADMIN_LOGIN),
+        )
+        conn.commit()
+    conn.close()
+
+
+_ensure_admin_account()
+
+
+def _is_admin() -> bool:
+    return session.get("rol") == ROL_ADMIN
+
+
+@app.context_processor
+def inject_globals():
+    return {"is_admin": _is_admin()}
 
 
 def login_required(func):
@@ -22,6 +67,19 @@ def login_required(func):
     def wrapper(*args, **kwargs):
         if "user_id" not in session:
             return redirect(url_for("login"))
+        return func(*args, **kwargs)
+
+    return wrapper
+
+
+def admin_required(func):
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        if "user_id" not in session:
+            return redirect(url_for("login"))
+        if not _is_admin():
+            flash("No tienes permisos de administrador.")
+            return redirect(url_for("dashboard"))
         return func(*args, **kwargs)
 
     return wrapper
@@ -37,6 +95,102 @@ PERIODO_TASA_ETIQUETAS = {
     6: "Bimestral",
     7: "Anual (se convierte a tasa mensual)",
 }
+
+PERIODO_OPCIONES = [(k, v) for k, v in PERIODO_TASA_ETIQUETAS.items()]
+
+CASOS_PRUEBA = {
+    "carlos": {
+        "nombres_cliente": "Carlos",
+        "apellidos_cliente": "Ramírez",
+        "correo_cliente": "carlos.ramirez@email.com",
+        "telefono_cliente": "987654321",
+        "direccion_cliente": "Av. Javier Prado 123, Lima",
+        "ingresos_mensuales": "8500",
+        "marca_vehiculo": "Toyota",
+        "modelo_vehiculo": "Corolla 2026",
+        "precio_vehiculo": "85000",
+        "cuota_inicial_pct": "20",
+        "moneda": "Soles",
+        "modalidad": MODALIDAD_CONVENCIONAL,
+        "cuota_balon_pct": "0",
+        "tipo_tasa": "Efectiva",
+        "periodo_tasa": "7",
+        "tasa_interes": "12.5",
+        "capitalizacion": "12",
+        "plazo_meses": "48",
+        "fecha_desembolso": "2026-08-15",
+        "periodo_gracia": "Parcial",
+        "meses_gracia": "2",
+        "seguro_desgravamen": "0.03",
+        "seguro_vehicular": "0.025",
+        "portes": "4",
+        "gastos_notariales": "450",
+        "gastos_registrales": "320",
+        "costos_iniciales": "150",
+        "tipo_cambio": "",
+    },
+    "maria": {
+        "nombres_cliente": "María",
+        "apellidos_cliente": "López",
+        "correo_cliente": "maria.lopez@email.com",
+        "telefono_cliente": "912345678",
+        "direccion_cliente": "Calle Los Pinos 456, Arequipa",
+        "ingresos_mensuales": "12000",
+        "marca_vehiculo": "Hyundai",
+        "modelo_vehiculo": "Tucson 2026",
+        "precio_vehiculo": "32000",
+        "cuota_inicial_pct": "15",
+        "moneda": "Dólares",
+        "modalidad": MODALIDAD_COMPRA_INTELIGENTE,
+        "cuota_balon_pct": "40",
+        "tipo_tasa": "Efectiva",
+        "periodo_tasa": "7",
+        "tasa_interes": "11.8",
+        "capitalizacion": "12",
+        "plazo_meses": "36",
+        "fecha_desembolso": "2026-09-01",
+        "periodo_gracia": "Ninguno",
+        "meses_gracia": "0",
+        "seguro_desgravamen": "0.035",
+        "seguro_vehicular": "0.03",
+        "portes": "5",
+        "gastos_notariales": "180",
+        "gastos_registrales": "120",
+        "costos_iniciales": "80",
+        "tipo_cambio": "3.75",
+    },
+}
+
+DEFAULTS_KEYS = (
+    "moneda",
+    "tipo_tasa",
+    "cuota_inicial_pct",
+    "plazo_meses",
+    "periodo_tasa",
+    "capitalizacion",
+    "periodo_gracia",
+    "meses_gracia",
+    "seguro_desgravamen",
+    "seguro_vehicular",
+    "portes",
+    "nombres_cliente",
+    "apellidos_cliente",
+    "correo_cliente",
+    "telefono_cliente",
+    "direccion_cliente",
+    "ingresos_mensuales",
+    "marca_vehiculo",
+    "modelo_vehiculo",
+    "precio_vehiculo",
+    "tasa_interes",
+    "fecha_desembolso",
+    "modalidad",
+    "cuota_balon_pct",
+    "gastos_notariales",
+    "gastos_registrales",
+    "costos_iniciales",
+    "tipo_cambio",
+)
 
 
 def etiqueta_periodo_tasa(valor) -> str:
@@ -54,13 +208,193 @@ def etiqueta_capitalizacion(valor) -> str:
         c = int(valor)
     except (TypeError, ValueError):
         return str(valor)
-    nombres = {
-        1: "Una vez al año",
-        2: "Semestral",
-        4: "Trimestral",
-        12: "Mensual",
-    }
+    nombres = {1: "Una vez al año", 2: "Semestral", 4: "Trimestral", 12: "Mensual"}
     return nombres.get(c, f"{c} veces al año")
+
+
+def _get_profile(user_id: int) -> dict:
+    conn = get_conn()
+    row = conn.execute(
+        "SELECT * FROM cliente WHERE id_usuario = ? ORDER BY id_cliente ASC LIMIT 1",
+        (user_id,),
+    ).fetchone()
+    conn.close()
+    if not row:
+        return {}
+    return {
+        "nombres_cliente": row["nombre_cliente"],
+        "apellidos_cliente": row["apellido_cliente"],
+        "correo_cliente": row["correo_cliente"] or "",
+        "telefono_cliente": row["telefono_cliente"] or "",
+        "direccion_cliente": row["direccion_cliente"] or "",
+        "ingresos_mensuales": row["ingresos_mensuales"],
+    }
+
+
+def _get_defaults() -> dict:
+    stored = session.get("defaults") or {}
+    base = {
+        "moneda": "Soles",
+        "tipo_tasa": "Efectiva",
+        "cuota_inicial_pct": 20,
+        "plazo_meses": 48,
+        "periodo_tasa": 7,
+        "capitalizacion": 12,
+        "periodo_gracia": "Ninguno",
+        "meses_gracia": 0,
+        "seguro_desgravamen": 0.03,
+        "seguro_vehicular": 0.025,
+        "portes": 4,
+        "modalidad": MODALIDAD_CONVENCIONAL,
+        "cuota_balon_pct": 0,
+        "gastos_notariales": 0,
+        "gastos_registrales": 0,
+        "costos_iniciales": 0,
+        "tipo_cambio": 3.75,
+    }
+    if "user_id" in session:
+        base.update(_get_profile(session["user_id"]))
+    base.update(stored)
+    if not base.get("fecha_desembolso"):
+        base["fecha_desembolso"] = date.today().isoformat()
+    return base
+
+
+def _save_profile(user_id: int, form) -> None:
+    dni = (session.get("dni") or "").strip()
+    if not dni:
+        raise ValueError("Tu cuenta no tiene DNI asociado.")
+    nombres = form.get("nombres_cliente", "").strip()[:100]
+    apellidos = form.get("apellidos_cliente", "").strip()[:100]
+    if not nombres or not apellidos:
+        raise ValueError("Nombres y apellidos son obligatorios.")
+    ingresos = float(form.get("ingresos_mensuales", 0))
+    if ingresos <= 0:
+        raise ValueError("Los ingresos mensuales deben ser mayores a 0.")
+    conn = get_conn()
+    _upsert_cliente(
+        conn,
+        user_id,
+        nombres,
+        apellidos,
+        dni,
+        form.get("correo_cliente", "").strip()[:150],
+        form.get("telefono_cliente", "").strip()[:20],
+        form.get("direccion_cliente", "").strip()[:200],
+        ingresos,
+    )
+    conn.commit()
+    conn.close()
+
+
+def _change_password(user_id: int, current: str, new_pass: str, confirm: str) -> None:
+    if len(new_pass) < 6:
+        raise ValueError("La nueva contraseña debe tener al menos 6 caracteres.")
+    if new_pass != confirm:
+        raise ValueError("Las contraseñas nuevas no coinciden.")
+    conn = get_conn()
+    user = conn.execute("SELECT password_hash FROM usuario WHERE id_usuario = ?", (user_id,)).fetchone()
+    if not user or not check_password_hash(user["password_hash"], current):
+        conn.close()
+        raise ValueError("La contraseña actual no es correcta.")
+    conn.execute(
+        "UPDATE usuario SET password_hash = ? WHERE id_usuario = ?",
+        (generate_password_hash(new_pass), user_id),
+    )
+    conn.commit()
+    conn.close()
+
+
+def _save_defaults_from_form(form) -> None:
+    defaults = _get_defaults()
+    for key in DEFAULTS_KEYS:
+        if key in form and str(form.get(key, "")).strip() != "":
+            defaults[key] = form.get(key)
+    session["defaults"] = defaults
+
+
+def _parse_simulation_form(form) -> dict:
+    capitalizacion_raw = form.get("capitalizacion", "").strip()
+    capitalizacion = int(capitalizacion_raw) if capitalizacion_raw else None
+    periodo_tasa = int(form.get("periodo_tasa", "7"))
+    modalidad = form.get("modalidad", MODALIDAD_CONVENCIONAL).strip()
+    cuota_balon_raw = form.get("cuota_balon_pct", "0").strip()
+    cuota_balon_pct = float(cuota_balon_raw) if cuota_balon_raw else 0.0
+    tipo_cambio_raw = form.get("tipo_cambio", "").strip()
+    tipo_cambio = float(tipo_cambio_raw) if tipo_cambio_raw else None
+    data = {
+        "nombres_cliente": form["nombres_cliente"].strip()[:100],
+        "apellidos_cliente": form["apellidos_cliente"].strip()[:100],
+        "correo_cliente": form.get("correo_cliente", "").strip()[:150],
+        "telefono_cliente": form.get("telefono_cliente", "").strip()[:20],
+        "direccion_cliente": form.get("direccion_cliente", "").strip()[:200],
+        "ingresos_mensuales": float(form["ingresos_mensuales"]),
+        "marca_vehiculo": form["marca_vehiculo"].strip()[:50],
+        "modelo_vehiculo": form["modelo_vehiculo"].strip()[:50],
+        "precio_vehiculo": float(form["precio_vehiculo"]),
+        "cuota_inicial_pct": float(form["cuota_inicial_pct"]),
+        "moneda": form["moneda"],
+        "tipo_tasa": form["tipo_tasa"],
+        "tasa_interes": float(form["tasa_interes"]) / 100.0,
+        "capitalizacion": capitalizacion,
+        "periodo_tasa": periodo_tasa,
+        "plazo_meses": int(form["plazo_meses"]),
+        "periodo_gracia": form["periodo_gracia"],
+        "meses_gracia": int(form.get("meses_gracia", 0)),
+        "seguro_desgravamen": float(form["seguro_desgravamen"]) / 100.0,
+        "seguro_vehicular": float(form["seguro_vehicular"]) / 100.0,
+        "portes": float(form["portes"]),
+        "fecha_desembolso": form.get("fecha_desembolso", "").strip(),
+        "modalidad": modalidad,
+        "cuota_balon_pct": cuota_balon_pct,
+        "gastos_notariales": float(form.get("gastos_notariales", 0) or 0),
+        "gastos_registrales": float(form.get("gastos_registrales", 0) or 0),
+        "costos_iniciales": float(form.get("costos_iniciales", 0) or 0),
+        "tipo_cambio": tipo_cambio,
+    }
+    if not data["nombres_cliente"] or not data["apellidos_cliente"]:
+        raise ValueError("Nombres y apellidos son obligatorios.")
+    if data["moneda"] not in ("Soles", "Dólares"):
+        raise ValueError("Moneda inválida.")
+    if data["tipo_tasa"] not in ("Efectiva", "Nominal"):
+        raise ValueError("Tipo de tasa inválido.")
+    if data["periodo_tasa"] < 0 or data["periodo_tasa"] > 7:
+        data["periodo_tasa"] = 7
+    if data["tipo_tasa"] == "Nominal" and (data["capitalizacion"] is None or data["capitalizacion"] < 1):
+        raise ValueError("Para tasa nominal indica la capitalización (≥ 1).")
+    if data["precio_vehiculo"] <= 0:
+        raise ValueError("El precio del vehículo debe ser mayor a 0.")
+    if not (0 <= data["cuota_inicial_pct"] < 100):
+        raise ValueError("La cuota inicial debe estar entre 0 % y 99 %.")
+    if data["tasa_interes"] <= 0:
+        raise ValueError("La tasa de interés debe ser mayor a 0.")
+    if data["plazo_meses"] < 1 or data["plazo_meses"] > 480:
+        raise ValueError("El plazo debe estar entre 1 y 480 meses.")
+    if data["periodo_gracia"] not in ("Ninguno", "Parcial", "Total"):
+        raise ValueError("Periodo de gracia inválido.")
+    if data["meses_gracia"] < 0 or data["meses_gracia"] >= data["plazo_meses"]:
+        raise ValueError("Los meses de gracia deben ser menores al plazo total.")
+    if data["ingresos_mensuales"] <= 0:
+        raise ValueError("Los ingresos mensuales deben ser mayores a 0.")
+    if data["modalidad"] not in (MODALIDAD_CONVENCIONAL, MODALIDAD_COMPRA_INTELIGENTE):
+        raise ValueError("Modalidad inválida.")
+    if data["modalidad"] == MODALIDAD_COMPRA_INTELIGENTE:
+        if data["cuota_balon_pct"] <= 0 or data["cuota_balon_pct"] >= 100:
+            raise ValueError("La cuota balón debe estar entre 0.01 % y 99 %.")
+    elif data["cuota_balon_pct"] != 0:
+        data["cuota_balon_pct"] = 0.0
+    if data["gastos_notariales"] < 0 or data["gastos_registrales"] < 0 or data["costos_iniciales"] < 0:
+        raise ValueError("Los gastos notariales, registrales e iniciales no pueden ser negativos.")
+    if data["moneda"] == "Dólares":
+        if not data["tipo_cambio"] or data["tipo_cambio"] <= 0:
+            raise ValueError("Indica el tipo de cambio (soles por dólar) para créditos en dólares.")
+    else:
+        data["tipo_cambio"] = data["tipo_cambio"] if data["tipo_cambio"] and data["tipo_cambio"] > 0 else None
+    if data["seguro_desgravamen"] < 0 or data["seguro_vehicular"] < 0 or data["portes"] < 0:
+        raise ValueError("Seguros y portes no pueden ser negativos.")
+    if not data["fecha_desembolso"] or not re.fullmatch(r"\d{4}-\d{2}-\d{2}", data["fecha_desembolso"]):
+        raise ValueError("La fecha de desembolso es obligatoria (AAAA-MM-DD).")
+    return data
 
 
 @app.get("/")
@@ -93,6 +427,9 @@ def register():
             flash("El DNI debe tener exactamente 8 dígitos.")
             return render_template("register.html")
 
+        if username.lower() == ADMIN_LOGIN:
+            flash("Ese nombre de usuario está reservado.")
+            return render_template("register.html")
         conn = get_conn()
         try:
             dup = conn.execute(
@@ -103,8 +440,11 @@ def register():
                 flash("Ese usuario o DNI ya está registrado.")
                 return render_template("register.html")
             conn.execute(
-                "INSERT INTO usuario (usuario_login, password_hash, dni_usuario) VALUES (?, ?, ?)",
-                (username, generate_password_hash(password), dni),
+                """
+                INSERT INTO usuario (usuario_login, password_hash, dni_usuario, rol)
+                VALUES (?, ?, ?, ?)
+                """,
+                (username, generate_password_hash(password), dni, ROL_USUARIO),
             )
             conn.commit()
             flash("Cuenta creada. Ahora inicia sesión.")
@@ -135,6 +475,10 @@ def login():
             session["username"] = user["usuario_login"]
             raw_dni = user["dni_usuario"] if "dni_usuario" in user.keys() else None
             session["dni"] = (raw_dni or "").strip() if raw_dni is not None else ""
+            rol = user["rol"] if "rol" in user.keys() and user["rol"] else ROL_USUARIO
+            session["rol"] = rol
+            if rol == ROL_ADMIN:
+                return redirect(url_for("admin_panel"))
             return redirect(url_for("dashboard"))
         flash("Credenciales inválidas.")
     return render_template("login.html")
@@ -150,7 +494,9 @@ def _list_creditos(id_usuario):
     conn = get_conn()
     rows = conn.execute(
         """
-        SELECT c.id_credito AS id, cl.nombre_cliente, cl.apellido_cliente, v.marca_vehiculo, v.modelo_vehiculo, c.created_at
+        SELECT c.id_credito AS id, cl.nombre_cliente, cl.apellido_cliente,
+               v.marca_vehiculo, v.modelo_vehiculo, c.moneda, c.fecha_desembolso, c.created_at,
+               COALESCE(c.modalidad, 'Convencional') AS modalidad
         FROM credito c
         JOIN cliente cl ON c.id_cliente = cl.id_cliente
         JOIN vehiculo v ON c.id_vehiculo = v.id_vehiculo
@@ -189,212 +535,343 @@ def _upsert_cliente(conn, id_usuario, nombres, apellidos, dni, correo, telefono,
     return cur.lastrowid
 
 
-@app.route("/dashboard", methods=["GET", "POST"])
+def _delete_credito(conn, credito_id: int) -> None:
+    conn.execute("DELETE FROM cronograma_pago WHERE id_credito = ?", (credito_id,))
+    conn.execute("DELETE FROM indicadores_financieros WHERE id_credito = ?", (credito_id,))
+    conn.execute("DELETE FROM seguro WHERE id_credito = ?", (credito_id,))
+    conn.execute("DELETE FROM credito WHERE id_credito = ?", (credito_id,))
+
+
+def _credito_access_clause() -> tuple[str, list]:
+    if _is_admin():
+        return "", []
+    return " AND cl.id_usuario = ?", [session["user_id"]]
+
+
+def _delete_usuario_completo(target_id: int) -> None:
+    if target_id == session.get("user_id"):
+        raise ValueError("No puedes eliminar tu propia cuenta mientras estás conectado.")
+    conn = get_conn()
+    user = conn.execute(
+        "SELECT id_usuario, usuario_login, rol FROM usuario WHERE id_usuario = ?",
+        (target_id,),
+    ).fetchone()
+    if not user:
+        conn.close()
+        raise ValueError("Usuario no encontrado.")
+    if user["rol"] == ROL_ADMIN:
+        conn.close()
+        raise ValueError("No se puede eliminar la cuenta de administrador.")
+    creditos = conn.execute(
+        """
+        SELECT c.id_credito FROM credito c
+        JOIN cliente cl ON c.id_cliente = cl.id_cliente
+        WHERE cl.id_usuario = ?
+        """,
+        (target_id,),
+    ).fetchall()
+    for row in creditos:
+        _delete_credito(conn, row["id_credito"])
+    conn.execute("DELETE FROM cliente WHERE id_usuario = ?", (target_id,))
+    conn.execute("DELETE FROM usuario WHERE id_usuario = ?", (target_id,))
+    conn.commit()
+    conn.close()
+
+
+def _create_credito(uid: int, data: dict) -> int:
+    dni_cuenta = (session.get("dni") or "").strip()
+    if not dni_cuenta:
+        raise ValueError("Tu cuenta no tiene DNI asociado. Regístrate de nuevo.")
+
+    result = build_schedule(
+        precio_vehiculo=data["precio_vehiculo"],
+        cuota_inicial_pct=data["cuota_inicial_pct"],
+        tipo_tasa=data["tipo_tasa"],
+        tasa_interes=data["tasa_interes"],
+        plazo_meses=data["plazo_meses"],
+        periodo_gracia=data["periodo_gracia"],
+        meses_gracia=data["meses_gracia"],
+        seguro_desgravamen=data["seguro_desgravamen"],
+        seguro_vehicular=data["seguro_vehicular"],
+        portes=data["portes"],
+        capitalizacion=data["capitalizacion"],
+        periodo_tasa=data["periodo_tasa"],
+        modalidad=data["modalidad"],
+        cuota_balon_pct=data["cuota_balon_pct"],
+        gastos_notariales=data["gastos_notariales"],
+        gastos_registrales=data["gastos_registrales"],
+        costos_iniciales=data["costos_iniciales"],
+    )
+
+    conn = get_conn()
+    cur = conn.cursor()
+    id_cliente = _upsert_cliente(
+        conn,
+        uid,
+        data["nombres_cliente"],
+        data["apellidos_cliente"],
+        dni_cuenta,
+        data["correo_cliente"],
+        data["telefono_cliente"],
+        data["direccion_cliente"],
+        data["ingresos_mensuales"],
+    )
+
+    cur.execute(
+        "INSERT INTO vehiculo (marca_vehiculo, modelo_vehiculo, precio_vehiculo) VALUES (?, ?, ?)",
+        (data["marca_vehiculo"], data["modelo_vehiculo"], data["precio_vehiculo"]),
+    )
+    id_vehiculo = cur.lastrowid
+
+    cur.execute(
+        """
+        INSERT INTO credito (
+            id_cliente, id_vehiculo, moneda, tipo_tasa, tasa_interes, capitalizacion, periodo_tasa, plazo_meses,
+            periodo_gracia, meses_gracia, cuota_inicial, fecha_desembolso, tem, cuota_base, total_financiado, flujo_json,
+            modalidad, cuota_balon_pct, cuota_balon_monto, gastos_notariales, gastos_registrales, costos_iniciales, tipo_cambio
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            id_cliente,
+            id_vehiculo,
+            data["moneda"],
+            data["tipo_tasa"],
+            data["tasa_interes"],
+            data["capitalizacion"],
+            data["periodo_tasa"],
+            data["plazo_meses"],
+            data["periodo_gracia"],
+            data["meses_gracia"],
+            data["cuota_inicial_pct"],
+            data["fecha_desembolso"],
+            result.tem,
+            result.cuota_base,
+            result.saldo_inicial,
+            json.dumps(result.flujo),
+            result.modalidad,
+            data["cuota_balon_pct"],
+            result.cuota_balon_monto,
+            data["gastos_notariales"],
+            data["gastos_registrales"],
+            data["costos_iniciales"],
+            data["tipo_cambio"],
+        ),
+    )
+    id_credito = cur.lastrowid
+
+    cur.execute(
+        "INSERT INTO seguro (id_credito, seguro_desgravamen, seguro_vehicular, portes) VALUES (?, ?, ?, ?)",
+        (id_credito, data["seguro_desgravamen"], data["seguro_vehicular"], data["portes"]),
+    )
+    cur.execute(
+        "INSERT INTO indicadores_financieros (id_credito, van, tir, tcea, tem) VALUES (?, ?, ?, ?, ?)",
+        (id_credito, result.van, result.tir, result.tcea, result.tem),
+    )
+    for row in result.schedule:
+        cur.execute(
+            """
+            INSERT INTO cronograma_pago (
+                id_credito, numero_cuota, cuota_base, interes_periodo, amortizacion_periodo,
+                saldo_pendiente, cuota_total, seguro_cuota, portes_cuota, cuota_balon
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                id_credito,
+                row.periodo,
+                result.cuota_base,
+                row.interes,
+                row.amortizacion,
+                row.saldo_final,
+                row.cuota_total,
+                row.seguro,
+                row.portes,
+                row.cuota_balon,
+            ),
+        )
+    conn.commit()
+    conn.close()
+    _save_defaults_from_form(data)
+    return id_credito
+
+
+@app.get("/dashboard")
 @login_required
 def dashboard():
-    uid = session["user_id"]
+    return render_template(
+        "dashboard.html",
+        plans=_list_creditos(session["user_id"]),
+        active_nav="dashboard",
+    )
+
+
+@app.route("/wizard", methods=["GET", "POST"])
+@login_required
+def wizard():
     if request.method == "POST":
         try:
-            dni_cuenta = (session.get("dni") or "").strip()
-            if not dni_cuenta:
-                flash("Tu cuenta no tiene DNI asociado. Crea una cuenta nueva o contacta al administrador.")
-                return render_template(
-                    "dashboard.html",
-                    plans=_list_creditos(session["user_id"]),
-                    username=session.get("username", ""),
-                    dni_cuenta=session.get("dni", ""),
-                )
-            nombres_cliente = request.form["nombres_cliente"].strip()[:100]
-            apellidos_cliente = request.form["apellidos_cliente"].strip()[:100]
-            correo_cliente = request.form.get("correo_cliente", "").strip()[:150]
-            telefono_cliente = request.form.get("telefono_cliente", "").strip()[:20]
-            direccion_cliente = request.form.get("direccion_cliente", "").strip()[:200]
-            ingresos_mensuales = float(request.form["ingresos_mensuales"])
-            marca_vehiculo = request.form["marca_vehiculo"].strip()[:50]
-            modelo_vehiculo = request.form["modelo_vehiculo"].strip()[:50]
-            precio_vehiculo = float(request.form["precio_vehiculo"])
-            cuota_inicial_pct = float(request.form["cuota_inicial_pct"])
-            moneda = request.form["moneda"]
-            tipo_tasa = request.form["tipo_tasa"]
-            tasa_interes = float(request.form["tasa_interes"]) / 100.0
-            capitalizacion_raw = request.form.get("capitalizacion", "").strip()
-            capitalizacion = int(capitalizacion_raw) if capitalizacion_raw else None
-            periodo_tasa = int(request.form.get("periodo_tasa", "7"))
-            plazo_meses = int(request.form["plazo_meses"])
-            periodo_gracia = request.form["periodo_gracia"]
-            meses_gracia = int(request.form.get("meses_gracia", 0))
-            seguro_desgravamen = float(request.form["seguro_desgravamen"]) / 100.0
-            seguro_vehicular = float(request.form["seguro_vehicular"]) / 100.0
-            portes = float(request.form["portes"])
-            fecha_desembolso = request.form.get("fecha_desembolso", "").strip()
-
-            # Validaciones de negocio
-            if not nombres_cliente or not apellidos_cliente:
-                raise ValueError("Nombres y apellidos son obligatorios.")
-            if moneda not in ("Soles", "Dólares"):
-                raise ValueError("Moneda inválida.")
-            if tipo_tasa not in ("Efectiva", "Nominal"):
-                raise ValueError("Tipo de tasa inválido.")
-            if periodo_tasa < 0 or periodo_tasa > 7:
-                periodo_tasa = 7
-            if tipo_tasa == "Nominal" and (capitalizacion is None or capitalizacion < 1):
-                raise ValueError("Para tasa nominal es obligatorio indicar la capitalización (≥ 1).")
-            if precio_vehiculo <= 0:
-                raise ValueError("El precio del vehículo debe ser mayor a 0.")
-            if not (0 <= cuota_inicial_pct < 100):
-                raise ValueError("La cuota inicial debe estar entre 0 % y 99 %.")
-            if tasa_interes <= 0:
-                raise ValueError("La tasa de interés debe ser mayor a 0.")
-            if plazo_meses < 1 or plazo_meses > 480:
-                raise ValueError("El plazo debe estar entre 1 y 480 meses.")
-            if periodo_gracia not in ("Ninguno", "Parcial", "Total"):
-                raise ValueError("Periodo de gracia inválido.")
-            if meses_gracia < 0 or meses_gracia >= plazo_meses:
-                raise ValueError("Los meses de gracia deben ser menores al plazo total.")
-            if ingresos_mensuales < 0:
-                raise ValueError("Los ingresos mensuales no pueden ser negativos.")
-            if seguro_desgravamen < 0 or seguro_vehicular < 0 or portes < 0:
-                raise ValueError("Seguros y portes no pueden ser negativos.")
-            if not fecha_desembolso or not re.fullmatch(r"\d{4}-\d{2}-\d{2}", fecha_desembolso):
-                raise ValueError("La fecha de desembolso es obligatoria (formato AAAA-MM-DD).")
-
-            result = build_schedule(
-                precio_vehiculo=precio_vehiculo,
-                cuota_inicial_pct=cuota_inicial_pct,
-                tipo_tasa=tipo_tasa,
-                tasa_interes=tasa_interes,
-                plazo_meses=plazo_meses,
-                periodo_gracia=periodo_gracia,
-                meses_gracia=meses_gracia,
-                seguro_desgravamen=seguro_desgravamen,
-                seguro_vehicular=seguro_vehicular,
-                portes=portes,
-                capitalizacion=capitalizacion,
-                periodo_tasa=periodo_tasa,
-            )
-
-            conn = get_conn()
-            cur = conn.cursor()
-            id_cliente = _upsert_cliente(
-                conn,
-                uid,
-                nombres_cliente,
-                apellidos_cliente,
-                dni_cuenta,
-                correo_cliente,
-                telefono_cliente,
-                direccion_cliente,
-                ingresos_mensuales,
-            )
-
-            cur.execute(
-                """
-                INSERT INTO vehiculo (marca_vehiculo, modelo_vehiculo, precio_vehiculo)
-                VALUES (?, ?, ?)
-                """,
-                (marca_vehiculo, modelo_vehiculo, precio_vehiculo),
-            )
-            id_vehiculo = cur.lastrowid
-
-            cur.execute(
-                """
-                INSERT INTO credito (
-                    id_cliente, id_vehiculo, moneda, tipo_tasa, tasa_interes, capitalizacion, periodo_tasa, plazo_meses,
-                    periodo_gracia, meses_gracia, cuota_inicial, fecha_desembolso, tem, cuota_base, total_financiado, flujo_json
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    id_cliente,
-                    id_vehiculo,
-                    moneda,
-                    tipo_tasa,
-                    tasa_interes,
-                    capitalizacion,
-                    periodo_tasa,
-                    plazo_meses,
-                    periodo_gracia,
-                    meses_gracia,
-                    cuota_inicial_pct,
-                    fecha_desembolso,
-                    result.tem,
-                    result.cuota_base,
-                    result.saldo_inicial,
-                    json.dumps(result.flujo),
-                ),
-            )
-            id_credito = cur.lastrowid
-
-            cur.execute(
-                """
-                INSERT INTO seguro (id_credito, seguro_desgravamen, seguro_vehicular, portes)
-                VALUES (?, ?, ?, ?)
-                """,
-                (id_credito, seguro_desgravamen, seguro_vehicular, portes),
-            )
-
-            cur.execute(
-                """
-                INSERT INTO indicadores_financieros (id_credito, van, tir, tcea, tem)
-                VALUES (?, ?, ?, ?, ?)
-                """,
-                (id_credito, result.van, result.tir, result.tcea, result.tem),
-            )
-
-            for row in result.schedule:
-                cur.execute(
-                    """
-                    INSERT INTO cronograma_pago (
-                        id_credito, numero_cuota, cuota_base, interes_periodo, amortizacion_periodo,
-                        saldo_pendiente, cuota_total, seguro_cuota, portes_cuota
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    """,
-                    (
-                        id_credito,
-                        row.periodo,
-                        result.cuota_base,
-                        row.interes,
-                        row.amortizacion,
-                        row.saldo_final,
-                        row.cuota_total,
-                        row.seguro,
-                        row.portes,
-                    ),
-                )
-
-            conn.commit()
-            conn.close()
+            data = _parse_simulation_form(request.form)
+            id_credito = _create_credito(session["user_id"], data)
             return redirect(url_for("plan_detail", credito_id=id_credito))
         except Exception as exc:
             flash(f"Error en cálculo o registro: {exc}")
-
+    defaults = _get_defaults()
+    caso = request.args.get("caso", "").strip().lower()
+    if caso in CASOS_PRUEBA:
+        defaults.update(CASOS_PRUEBA[caso])
+        flash(f"Caso de prueba cargado: {caso.title()}.")
     return render_template(
-        "dashboard.html",
-        plans=_list_creditos(uid),
-        username=session.get("username", ""),
-        dni_cuenta=session.get("dni", ""),
+        "wizard.html",
+        defaults=defaults,
+        periodo_opciones=PERIODO_OPCIONES,
+        active_nav="wizard",
+        modalidades=(MODALIDAD_CONVENCIONAL, MODALIDAD_COMPRA_INTELIGENTE),
+        casos_prueba=CASOS_PRUEBA,
     )
+
+
+@app.route("/settings", methods=["GET", "POST"])
+@login_required
+def settings():
+    if request.method == "POST":
+        action = request.form.get("action", "defaults")
+        try:
+            if action == "profile":
+                _save_profile(session["user_id"], request.form)
+                flash("Perfil actualizado.")
+            elif action == "password":
+                _change_password(
+                    session["user_id"],
+                    request.form.get("current_password", ""),
+                    request.form.get("new_password", ""),
+                    request.form.get("new_password_confirm", ""),
+                )
+                flash("Contraseña actualizada.")
+            else:
+                _save_defaults_from_form(request.form)
+                flash("Valores por defecto guardados.")
+        except Exception as exc:
+            flash(str(exc))
+        return redirect(url_for("settings"))
+    conn = get_conn()
+    user_row = conn.execute(
+        "SELECT usuario_login, dni_usuario FROM usuario WHERE id_usuario = ?",
+        (session["user_id"],),
+    ).fetchone()
+    conn.close()
+    return render_template(
+        "settings.html",
+        defaults=_get_defaults(),
+        profile=_get_profile(session["user_id"]),
+        account=user_row,
+        active_nav="settings",
+    )
+
+
+@app.get("/admin")
+@admin_required
+def admin_panel():
+    conn = get_conn()
+    stats = {
+        "usuarios": conn.execute(
+            "SELECT COUNT(*) AS n FROM usuario WHERE rol IS NULL OR rol != ?",
+            (ROL_ADMIN,),
+        ).fetchone()["n"],
+        "simulaciones": conn.execute("SELECT COUNT(*) AS n FROM credito").fetchone()["n"],
+    }
+    por_modalidad = conn.execute(
+        """
+        SELECT COALESCE(modalidad, 'Convencional') AS modalidad, COUNT(*) AS total
+        FROM credito GROUP BY COALESCE(modalidad, 'Convencional')
+        ORDER BY total DESC
+        """
+    ).fetchall()
+    por_moneda = conn.execute(
+        "SELECT moneda, COUNT(*) AS total FROM credito GROUP BY moneda ORDER BY total DESC"
+    ).fetchall()
+    creditos = conn.execute(
+        """
+        SELECT c.id_credito AS id, u.usuario_login, cl.nombre_cliente, cl.apellido_cliente,
+               v.marca_vehiculo, v.modelo_vehiculo, c.moneda,
+               COALESCE(c.modalidad, 'Convencional') AS modalidad, c.created_at
+        FROM credito c
+        JOIN cliente cl ON c.id_cliente = cl.id_cliente
+        JOIN usuario u ON cl.id_usuario = u.id_usuario
+        JOIN vehiculo v ON c.id_vehiculo = v.id_vehiculo
+        ORDER BY c.id_credito DESC
+        """
+    ).fetchall()
+    usuarios = conn.execute(
+        """
+        SELECT u.id_usuario, u.usuario_login, u.dni_usuario, u.created_at,
+               COALESCE(u.rol, 'usuario') AS rol,
+               (SELECT COUNT(*) FROM credito c
+                JOIN cliente cl ON c.id_cliente = cl.id_cliente
+                WHERE cl.id_usuario = u.id_usuario) AS num_creditos
+        FROM usuario u
+        ORDER BY u.id_usuario ASC
+        """
+    ).fetchall()
+    conn.close()
+    return render_template(
+        "admin.html",
+        stats=stats,
+        por_modalidad=por_modalidad,
+        por_moneda=por_moneda,
+        creditos=creditos,
+        usuarios=usuarios,
+        active_nav="admin",
+    )
+
+
+@app.post("/admin/users/<int:user_id>/delete")
+@admin_required
+def admin_delete_user(user_id: int):
+    try:
+        _delete_usuario_completo(user_id)
+        flash("Usuario eliminado.")
+    except Exception as exc:
+        flash(str(exc))
+    return redirect(url_for("admin_panel"))
+
+
+@app.post("/admin/plans/<int:credito_id>/delete")
+@admin_required
+def admin_delete_plan(credito_id: int):
+    conn = get_conn()
+    row = conn.execute("SELECT id_credito FROM credito WHERE id_credito = ?", (credito_id,)).fetchone()
+    if not row:
+        conn.close()
+        flash("Simulación no encontrada.")
+        return redirect(url_for("admin_panel"))
+    _delete_credito(conn, credito_id)
+    conn.commit()
+    conn.close()
+    flash("Simulación eliminada.")
+    return redirect(url_for("admin_panel"))
 
 
 @app.get("/plans/<int:credito_id>")
 @login_required
 def plan_detail(credito_id: int):
+    extra, params = _credito_access_clause()
     conn = get_conn()
     row = conn.execute(
-        """
+        f"""
         SELECT c.*, cl.nombre_cliente, cl.apellido_cliente, cl.dni_cliente,
                v.marca_vehiculo, v.modelo_vehiculo, i.van, i.tir, i.tcea
         FROM credito c
         JOIN cliente cl ON c.id_cliente = cl.id_cliente
         JOIN vehiculo v ON c.id_vehiculo = v.id_vehiculo
         LEFT JOIN indicadores_financieros i ON c.id_credito = i.id_credito
-        WHERE c.id_credito = ? AND cl.id_usuario = ?
+        WHERE c.id_credito = ?{extra}
         """,
-        (credito_id, session["user_id"]),
+        [credito_id, *params],
     ).fetchone()
     schedule = conn.execute(
         """
         SELECT numero_cuota AS periodo, cuota_base, interes_periodo AS interes, amortizacion_periodo AS amortizacion,
-               saldo_pendiente AS saldo_final, cuota_total, seguro_cuota AS seguro, portes_cuota AS portes
+               saldo_pendiente AS saldo_final, cuota_total, seguro_cuota AS seguro, portes_cuota AS portes,
+               COALESCE(cuota_balon, 0) AS cuota_balon
         FROM cronograma_pago WHERE id_credito = ? ORDER BY numero_cuota ASC
         """,
         (credito_id,),
@@ -403,14 +880,115 @@ def plan_detail(credito_id: int):
     if not row:
         flash("Crédito no encontrado.")
         return redirect(url_for("dashboard"))
+
     periodo_tasa = row["periodo_tasa"] if "periodo_tasa" in row.keys() else 7
     cap = row["capitalizacion"] if "capitalizacion" in row.keys() else None
+    total_pagar = sum(r["cuota_total"] for r in schedule)
+    sym = "S/" if row["moneda"] == "Soles" else "$"
+
+    modalidad = row["modalidad"] if "modalidad" in row.keys() and row["modalidad"] else MODALIDAD_CONVENCIONAL
+    cuota_balon_monto = row["cuota_balon_monto"] if "cuota_balon_monto" in row.keys() else 0
+    gastos_not = row["gastos_notariales"] if "gastos_notariales" in row.keys() else 0
+    gastos_reg = row["gastos_registrales"] if "gastos_registrales" in row.keys() else 0
+    costos_ini = row["costos_iniciales"] if "costos_iniciales" in row.keys() else 0
+    tipo_cambio = row["tipo_cambio"] if "tipo_cambio" in row.keys() else None
+
     return render_template(
         "plan_detail.html",
         plan=row,
         schedule=schedule,
         periodo_tasa_etiqueta=etiqueta_periodo_tasa(periodo_tasa),
         capitalizacion_etiqueta=etiqueta_capitalizacion(cap),
+        total_pagar=total_pagar,
+        sym=sym,
+        modalidad=modalidad,
+        cuota_balon_monto=cuota_balon_monto,
+        gastos_totales=(gastos_not or 0) + (gastos_reg or 0) + (costos_ini or 0),
+        gastos_notariales=gastos_not,
+        gastos_registrales=gastos_reg,
+        costos_iniciales=costos_ini,
+        tipo_cambio=tipo_cambio,
+        chart_labels=[r["periodo"] for r in schedule],
+        chart_intereses=[r["interes"] for r in schedule],
+        chart_amort=[r["amortizacion"] for r in schedule],
+        active_nav="admin" if _is_admin() else "dashboard",
+    )
+
+
+@app.post("/plans/<int:credito_id>/delete")
+@login_required
+def plan_delete(credito_id: int):
+    extra, params = _credito_access_clause()
+    conn = get_conn()
+    row = conn.execute(
+        f"""
+        SELECT c.id_credito FROM credito c
+        JOIN cliente cl ON c.id_cliente = cl.id_cliente
+        WHERE c.id_credito = ?{extra}
+        """,
+        [credito_id, *params],
+    ).fetchone()
+    if not row:
+        conn.close()
+        flash("Simulación no encontrada.")
+        return redirect(url_for("dashboard"))
+    _delete_credito(conn, credito_id)
+    conn.commit()
+    conn.close()
+    flash("Simulación eliminada.")
+    redirect_to = url_for("admin_panel") if _is_admin() and request.referrer and "/admin" in request.referrer else url_for("dashboard")
+    return redirect(redirect_to)
+
+
+@app.get("/plans/<int:credito_id>/csv")
+@login_required
+def plan_csv(credito_id: int):
+    extra, params = _credito_access_clause()
+    conn = get_conn()
+    row = conn.execute(
+        f"""
+        SELECT c.id_credito, cl.nombre_cliente, cl.apellido_cliente
+        FROM credito c
+        JOIN cliente cl ON c.id_cliente = cl.id_cliente
+        WHERE c.id_credito = ?{extra}
+        """,
+        [credito_id, *params],
+    ).fetchone()
+    schedule = conn.execute(
+        """
+        SELECT numero_cuota, cuota_total, interes_periodo, amortizacion_periodo,
+               seguro_cuota, portes_cuota, saldo_pendiente, COALESCE(cuota_balon, 0) AS cuota_balon
+        FROM cronograma_pago WHERE id_credito = ? ORDER BY numero_cuota
+        """,
+        (credito_id,),
+    ).fetchall()
+    conn.close()
+    if not row:
+        flash("Crédito no encontrado.")
+        return redirect(url_for("dashboard"))
+
+    buf = io.StringIO()
+    writer = csv.writer(buf)
+    writer.writerow(["N°", "Cuota Total", "Interés", "Amortización", "Cuota Balón", "Seguro", "Portes", "Saldo Final"])
+    for r in schedule:
+        writer.writerow(
+            [
+                r["numero_cuota"],
+                f"{r['cuota_total']:.2f}",
+                f"{r['interes_periodo']:.2f}",
+                f"{r['amortizacion_periodo']:.2f}",
+                f"{r['cuota_balon']:.2f}",
+                f"{r['seguro_cuota']:.2f}",
+                f"{r['portes_cuota']:.2f}",
+                f"{r['saldo_pendiente']:.2f}",
+            ]
+        )
+    output = buf.getvalue()
+    filename = f"credito_{credito_id}_cronograma.csv"
+    return Response(
+        output,
+        mimetype="text/csv",
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
     )
 
 

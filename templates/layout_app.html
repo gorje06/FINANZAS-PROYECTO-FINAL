@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="FinanCuota — Simulador profesional de crédito vehicular." />
+    <title>{% block title %}FinanCuota{% endblock %}</title>
+    <link rel="icon" href="{{ url_for('static', filename='financuota-logo-informe-upc.png') }}" />
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar" id="sidebar">
+        <div class="sidebar-brand">
+          <img class="brand-logo-img" src="{{ url_for('static', filename='financuota-logo-informe-upc.png') }}" alt="FinanCuota" />
+          <span class="sidebar-brand-text">FinanCuota</span>
+        </div>
+        <nav class="sidebar-nav">
+          <span class="sidebar-section-label">Menú</span>
+          <a href="{{ url_for('dashboard') }}" class="sidebar-link {% if active_nav == 'dashboard' %}active{% endif %}" id="nav-dashboard">
+            <span class="icon"></span> Dashboard
+          </a>
+          <a href="{{ url_for('wizard') }}" class="sidebar-link {% if active_nav == 'wizard' %}active{% endif %}" id="nav-wizard">
+            <span class="icon"></span> Nueva Simulación
+          </a>
+          <a href="{{ url_for('settings') }}" class="sidebar-link {% if active_nav == 'settings' %}active{% endif %}" id="nav-settings">
+            <span class="icon"></span> Configuración
+          </a>
+          {% if is_admin %}
+          <a href="{{ url_for('admin_panel') }}" class="sidebar-link {% if active_nav == 'admin' %}active{% endif %}" id="nav-admin">
+            <span class="icon"></span> Administración
+          </a>
+          {% endif %}
+        </nav>
+        <div class="sidebar-footer">
+          <div class="sidebar-user">
+            <div class="sidebar-avatar" id="sidebar-avatar-initials">{{ (session.get('username') or 'U')[0]|upper }}</div>
+            <div class="sidebar-user-info">
+              <div class="sidebar-user-name">{{ session.get('username', '') }}{% if is_admin %} <span class="badge badge-accent" style="font-size:10px;padding:2px 6px;">Admin</span>{% endif %}</div>
+              {% if session.get('dni') %}
+              <div class="sidebar-user-dni">DNI {{ session.get('dni') }}</div>
+              {% endif %}
+            </div>
+          </div>
+          <a href="{{ url_for('logout') }}" class="btn btn-ghost btn-sm" style="width:100%;margin-top:var(--space-3);" id="btn-logout">Cerrar sesión</a>
+        </div>
+      </aside>
+      <div class="sidebar-overlay" id="sidebar-overlay" onclick="toggleSidebar()"></div>
+      <div class="main-content">
+        <header class="topbar">
+          <div style="display:flex;align-items:center;gap:var(--space-3)">
+            <button class="sidebar-toggle" id="sidebar-toggle-btn" onclick="toggleSidebar()" aria-label="Abrir menú" type="button">☰</button>
+            <h1 class="topbar-title">{% block page_title %}FinanCuota{% endblock %}</h1>
+          </div>
+          <div class="topbar-actions">{% block topbar_actions %}{% endblock %}</div>
+        </header>
+        <div class="page-content">
+          {% with messages = get_flashed_messages() %}
+          {% if messages %}
+          {% for m in messages %}
+          <div class="flash flash-info" style="padding:var(--space-3) var(--space-4);margin-bottom:var(--space-4);border-radius:var(--radius-md);background:var(--color-primary-50);color:var(--color-primary-700);font-size:var(--text-sm);">{{ m }}</div>
+          {% endfor %}
+          {% endif %}
+          {% endwith %}
+          {% block content %}{% endblock %}
+        </div>
+      </div>
+    </div>
+    <script>
+      function toggleSidebar() {
+        document.getElementById('sidebar').classList.toggle('open');
+        document.getElementById('sidebar-overlay').classList.toggle('open');
+      }
+    </script>
+    {% block page_scripts %}{% endblock %}
+  </body>
+</html>

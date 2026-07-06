@@ -1,0 +1,123 @@
+{% extends "layout_app.html" %}
+{% block title %}Administración — FinanCuota{% endblock %}
+{% block page_title %}Panel de administración{% endblock %}
+{% block topbar_actions %}
+<a href="{{ url_for('dashboard') }}" class="btn btn-ghost btn-sm">← Dashboard</a>
+{% endblock %}
+{% block content %}
+
+<div class="kpi-grid" style="margin-bottom:var(--space-6);">
+  <div class="kpi-card animate-in">
+    <div class="kpi-label">Usuarios registrados</div>
+    <div class="kpi-value">{{ stats.usuarios }}</div>
+  </div>
+  <div class="kpi-card animate-in">
+    <div class="kpi-label">Simulaciones totales</div>
+    <div class="kpi-value accent">{{ stats.simulaciones }}</div>
+  </div>
+  <div class="kpi-card animate-in">
+    <div class="kpi-label">Por modalidad</div>
+    <div style="margin-top:var(--space-2);font-size:var(--text-sm);color:var(--color-neutral-700);">
+      {% for row in por_modalidad %}
+      <div>{{ row.modalidad }}: <strong>{{ row.total }}</strong></div>
+      {% else %}
+      <div>Sin datos</div>
+      {% endfor %}
+    </div>
+  </div>
+  <div class="kpi-card animate-in">
+    <div class="kpi-label">Por moneda</div>
+    <div style="margin-top:var(--space-2);font-size:var(--text-sm);color:var(--color-neutral-700);">
+      {% for row in por_moneda %}
+      <div>{{ row.moneda }}: <strong>{{ row.total }}</strong></div>
+      {% else %}
+      <div>Sin datos</div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<div class="card animate-in" style="padding:0;overflow:hidden;margin-bottom:var(--space-6);">
+  <div style="padding:var(--space-5) var(--space-6);border-bottom:var(--border-light);">
+    <h3 style="margin:0;font-size:var(--text-lg);color:var(--color-primary-900);">Todas las simulaciones</h3>
+  </div>
+  <div class="table-container" style="border:none;">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Usuario</th>
+          <th>Cliente</th>
+          <th>Vehículo</th>
+          <th>Modalidad</th>
+          <th>Moneda</th>
+          <th style="text-align:right;">Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for plan in creditos %}
+        <tr>
+          <td>{{ plan.id }}</td>
+          <td>{{ plan.usuario_login }}</td>
+          <td>{{ plan.nombre_cliente }} {{ plan.apellido_cliente }}</td>
+          <td>{{ plan.marca_vehiculo }} {{ plan.modelo_vehiculo }}</td>
+          <td><span class="badge {% if plan.modalidad == 'Compra Inteligente' %}badge-accent{% else %}badge-primary{% endif %}">{{ plan.modalidad }}</span></td>
+          <td>{{ plan.moneda }}</td>
+          <td style="text-align:right;white-space:nowrap;">
+            <a href="{{ url_for('plan_detail', credito_id=plan.id) }}" class="btn btn-secondary btn-sm">Ver</a>
+            <a href="{{ url_for('plan_csv', credito_id=plan.id) }}" class="btn btn-ghost btn-sm">CSV</a>
+            <form method="post" action="{{ url_for('admin_delete_plan', credito_id=plan.id) }}" style="display:inline;" onsubmit="return confirm('¿Eliminar esta simulación?');">
+              <button type="submit" class="btn btn-danger btn-sm">Eliminar</button>
+            </form>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="7" style="text-align:center;color:var(--color-neutral-500);padding:var(--space-8);">No hay simulaciones registradas.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="card animate-in" style="padding:0;overflow:hidden;">
+  <div style="padding:var(--space-5) var(--space-6);border-bottom:var(--border-light);">
+    <h3 style="margin:0;font-size:var(--text-lg);color:var(--color-primary-900);">Usuarios del sistema</h3>
+  </div>
+  <div class="table-container" style="border:none;">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Usuario</th>
+          <th>DNI</th>
+          <th>Rol</th>
+          <th>Simulaciones</th>
+          <th>Registro</th>
+          <th style="text-align:right;">Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for u in usuarios %}
+        <tr>
+          <td>{{ u.id_usuario }}</td>
+          <td>{{ u.usuario_login }}</td>
+          <td>{{ u.dni_usuario }}</td>
+          <td><span class="badge {% if u.rol == 'admin' %}badge-accent{% else %}badge-primary{% endif %}">{{ u.rol }}</span></td>
+          <td>{{ u.num_creditos }}</td>
+          <td>{{ u.created_at }}</td>
+          <td style="text-align:right;">
+            {% if u.rol != 'admin' %}
+            <form method="post" action="{{ url_for('admin_delete_user', user_id=u.id_usuario) }}" style="display:inline;" onsubmit="return confirm('¿Eliminar usuario {{ u.usuario_login }} y todas sus simulaciones?');">
+              <button type="submit" class="btn btn-danger btn-sm">Eliminar</button>
+            </form>
+            {% else %}
+            <span style="color:var(--color-neutral-400);font-size:var(--text-sm);">—</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

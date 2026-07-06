@@ -1,56 +1,178 @@
-{% extends "base.html" %}
+{% extends "layout_app.html" %}
+{% block title %}Crédito #{{ plan.id_credito }} — FinanCuota{% endblock %}
+{% block page_title %}Detalle del Crédito{% endblock %}
+{% block topbar_actions %}
+<a href="{{ url_for('dashboard') }}" class="btn btn-ghost btn-sm">← Dashboard</a>
+<a href="{{ url_for('plan_csv', credito_id=plan.id_credito) }}" class="btn btn-secondary btn-sm" id="btn-export-csv">Exportar CSV</a>
+{% endblock %}
 {% block content %}
-<section class="card">
-  <h2>Detalle del crédito #{{ plan.id_credito }}</h2>
-  <p><b>Cliente:</b> {{ plan.nombre_cliente }} {{ plan.apellido_cliente }} - DNI {{ plan.dni_cliente }}</p>
-  <p><b>Vehículo:</b> {{ plan.marca_vehiculo }} {{ plan.modelo_vehiculo }}</p>
-  <p><b>Fecha de desembolso:</b> {{ plan.fecha_desembolso }}</p>
-  <p><b>Capital financiado:</b> {{ "%.2f"|format(plan.total_financiado) }} {{ plan.moneda }}</p>
-  <p class="credito-meta">
-    <b>Condición de la tasa:</b>
-    {% if plan.tipo_tasa == 'Efectiva' %}
-      efectiva · {{ periodo_tasa_etiqueta }}
-    {% else %}
-      nominal · capitalización {{ capitalizacion_etiqueta }}
-    {% endif %}
-    · <b>Tasa ingresada:</b> {{ "%.4f"|format(plan.tasa_interes * 100) }}%
-  </p>
+{% set sym = 'S/' if plan.moneda == 'Soles' else '$' %}
 
-  <div class="kpis">
-    <div><span>TEM</span><strong>{{ "%.4f"|format(plan.tem * 100) }}%</strong></div>
-    <div><span>Cuota Base</span><strong>{{ "%.2f"|format(plan.cuota_base) }}</strong></div>
-    <div><span>VAN</span><strong>{{ "%.2f"|format(plan.van) }}</strong></div>
-    <div><span>TIR mensual</span><strong>{{ "%.4f"|format(plan.tir * 100) }}%</strong></div>
-    <div><span>TCEA</span><strong>{{ "%.4f"|format(plan.tcea * 100) }}%</strong></div>
+<div class="detail-header animate-in">
+  <div class="detail-header-info">
+    <h2>Crédito #{{ plan.id_credito }} — {{ plan.nombre_cliente }} {{ plan.apellido_cliente }}</h2>
+    <div class="detail-meta">
+      <span class="detail-meta-item"><span class="badge badge-primary">{{ plan.moneda }}</span></span>
+      <span class="detail-meta-item"><span class="badge {% if modalidad == 'Compra Inteligente' %}badge-accent{% else %}badge-primary{% endif %}">{{ modalidad }}</span></span>
+      <span class="detail-meta-item">{{ plan.marca_vehiculo }} {{ plan.modelo_vehiculo }}</span>
+      <span class="detail-meta-item">DNI {{ plan.dni_cliente }}</span>
+      <span class="detail-meta-item">{{ plan.fecha_desembolso }}</span>
+      {% if tipo_cambio %}
+      <span class="detail-meta-item">TC S/ {{ "%.4f"|format(tipo_cambio) }}</span>
+      {% endif %}
+      <span class="detail-meta-item">
+        {% if plan.tipo_tasa == 'Efectiva' %}
+        <span class="badge badge-accent">Efectiva · {{ periodo_tasa_etiqueta }}</span>
+        {% else %}
+        <span class="badge badge-accent">Nominal · {{ capitalizacion_etiqueta }}</span>
+        {% endif %}
+      </span>
+    </div>
   </div>
+</div>
 
-  <h3>Cronograma</h3>
-  <table>
-    <thead>
-      <tr>
-        <th>Periodo</th>
-        <th>Cuota total</th>
-        <th>Interés</th>
-        <th>Amortización</th>
-        <th>Seguro</th>
-        <th>Portes</th>
-        <th>Saldo final</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for row in schedule %}
-      <tr>
-        <td>{{ row.periodo }}</td>
-        <td>{{ "%.2f"|format(row.cuota_total) }}</td>
-        <td>{{ "%.2f"|format(row.interes) }}</td>
-        <td>{{ "%.2f"|format(row.amortizacion) }}</td>
-        <td>{{ "%.2f"|format(row.seguro) }}</td>
-        <td>{{ "%.2f"|format(row.portes) }}</td>
-        <td>{{ "%.2f"|format(row.saldo_final) }}</td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-  <p><a href="{{ url_for('dashboard') }}">Volver</a></p>
-</section>
+<div class="kpi-grid">
+  <div class="kpi-card animate-in">
+    <div class="kpi-icon">$</div>
+    <div class="kpi-label">Cuota Mensual Base</div>
+    <div class="kpi-value">{{ sym }} {{ "%.2f"|format(plan.cuota_base) }}</div>
+  </div>
+  {% if cuota_balon_monto and cuota_balon_monto > 0 %}
+  <div class="kpi-card animate-in">
+    <div class="kpi-icon">$</div>
+    <div class="kpi-label">Cuota Balón (final)</div>
+    <div class="kpi-value accent">{{ sym }} {{ "%.2f"|format(cuota_balon_monto) }}</div>
+  </div>
+  {% endif %}
+  <div class="kpi-card animate-in">
+    <div class="kpi-icon">%</div>
+    <div class="kpi-label">TCEA (deudor)</div>
+    <div class="kpi-value accent">{{ "%.4f"|format(plan.tcea * 100) }}%</div>
+  </div>
+  <div class="kpi-card animate-in">
+    <div class="kpi-icon">%</div>
+    <div class="kpi-label">TEA</div>
+    <div class="kpi-value">{{ "%.4f"|format(plan.tasa_interes * 100) }}%</div>
+  </div>
+  <div class="kpi-card animate-in">
+    <div class="kpi-icon">$</div>
+    <div class="kpi-label">VAN (deudor)</div>
+    <div class="kpi-value">{{ sym }} {{ "%.2f"|format(plan.van) }}</div>
+  </div>
+  <div class="kpi-card animate-in">
+    <div class="kpi-icon">%</div>
+    <div class="kpi-label">TIR Mensual (deudor)</div>
+    <div class="kpi-value">{{ "%.4f"|format(plan.tir * 100) }}%</div>
+  </div>
+  <div class="kpi-card animate-in">
+    <div class="kpi-icon">$</div>
+    <div class="kpi-label">Total a Pagar</div>
+    <div class="kpi-value">{{ sym }} {{ "%.2f"|format(total_pagar) }}</div>
+  </div>
+</div>
+
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:var(--space-4);margin-bottom:var(--space-6);">
+  <div class="card animate-in" style="padding:var(--space-4);">
+    <div class="kpi-label">Capital Financiado</div>
+    <div style="font-size:var(--text-lg);font-weight:700;color:var(--color-primary-900);margin-top:var(--space-1);">{{ sym }} {{ "%.2f"|format(plan.total_financiado) }}</div>
+    <div style="font-size:var(--text-xs);color:var(--color-neutral-500);margin-top:var(--space-1);">Incluye gastos notariales/registrales</div>
+  </div>
+  <div class="card animate-in" style="padding:var(--space-4);">
+    <div class="kpi-label">Gastos iniciales financiados</div>
+    <div style="font-size:var(--text-lg);font-weight:700;color:var(--color-primary-900);margin-top:var(--space-1);">{{ sym }} {{ "%.2f"|format(gastos_totales) }}</div>
+    <div style="font-size:var(--text-xs);color:var(--color-neutral-500);margin-top:var(--space-1);">Notarial {{ sym }} {{ "%.2f"|format(gastos_notariales) }} · Registral {{ sym }} {{ "%.2f"|format(gastos_registrales) }} · Otros {{ sym }} {{ "%.2f"|format(costos_iniciales) }}</div>
+  </div>
+  <div class="card animate-in" style="padding:var(--space-4);">
+    <div class="kpi-label">TEM</div>
+    <div style="font-size:var(--text-lg);font-weight:700;color:var(--color-primary-900);margin-top:var(--space-1);">{{ "%.6f"|format(plan.tem * 100) }}%</div>
+  </div>
+  <div class="card animate-in" style="padding:var(--space-4);">
+    <div class="kpi-label">Periodo de gracia</div>
+    <div style="font-size:var(--text-lg);font-weight:700;color:var(--color-primary-900);margin-top:var(--space-1);">{{ plan.periodo_gracia }}{% if plan.meses_gracia %} ({{ plan.meses_gracia }} meses){% endif %}</div>
+  </div>
+</div>
+
+<div class="chart-container animate-in">
+  <div class="chart-title">Interés vs Amortización por Período</div>
+  <div class="chart-canvas-wrap">
+    <canvas id="schedule-chart"></canvas>
+  </div>
+</div>
+
+<div class="card animate-in" style="padding:0;overflow:hidden;">
+  <div style="padding:var(--space-5) var(--space-6);border-bottom:var(--border-light);display:flex;justify-content:space-between;align-items:center;">
+    <h3 style="margin:0;font-size:var(--text-lg);color:var(--color-primary-900);">Cronograma de Pagos</h3>
+    <span class="badge badge-primary">{{ schedule|length }} cuotas</span>
+  </div>
+  <div class="schedule-scroll table-container" style="border:none;border-radius:0;">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>N°</th>
+          <th>Cuota Total</th>
+          <th>Interés</th>
+          <th>Amortización</th>
+          <th>Cuota Balón</th>
+          <th>Seguro</th>
+          <th>Portes</th>
+          <th>Saldo Final</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in schedule %}
+        <tr{% if row.cuota_balon and row.cuota_balon > 0 %} style="background:var(--color-accent-50);"{% endif %}>
+          <td>{{ row.periodo }}</td>
+          <td><strong>{{ "%.2f"|format(row.cuota_total) }}</strong></td>
+          <td>{{ "%.2f"|format(row.interes) }}</td>
+          <td>{{ "%.2f"|format(row.amortizacion) }}</td>
+          <td>{% if row.cuota_balon and row.cuota_balon > 0 %}<strong>{{ "%.2f"|format(row.cuota_balon) }}</strong>{% else %}—{% endif %}</td>
+          <td>{{ "%.2f"|format(row.seguro) }}</td>
+          <td>{{ "%.2f"|format(row.portes) }}</td>
+          <td>{{ "%.2f"|format(row.saldo_final) }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+{% block page_scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+(function () {
+  var labels = {{ chart_labels|tojson }};
+  var intereses = {{ chart_intereses|tojson }};
+  var amortizaciones = {{ chart_amort|tojson }};
+  var sym = {{ sym|tojson }};
+  var ctx = document.getElementById('schedule-chart');
+  if (!ctx || !labels.length) return;
+  new Chart(ctx.getContext('2d'), {
+    type: 'bar',
+    data: {
+      labels: labels,
+      datasets: [
+        { label: 'Interés', data: intereses, backgroundColor: 'rgba(232, 85, 106, 0.75)', borderColor: 'rgba(179, 0, 27, 1)', borderWidth: 1, borderRadius: 2 },
+        { label: 'Amortización', data: amortizaciones, backgroundColor: 'rgba(122, 0, 19, 0.75)', borderColor: 'rgba(61, 0, 9, 1)', borderWidth: 1, borderRadius: 2 }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { intersect: false, mode: 'index' },
+      plugins: {
+        legend: { position: 'top', labels: { usePointStyle: true, padding: 20, font: { family: 'Inter', size: 12, weight: '600' } } },
+        tooltip: {
+          callbacks: {
+            label: function (c) { return c.dataset.label + ': ' + sym + ' ' + c.raw.toLocaleString('es-PE', { minimumFractionDigits: 2 }); }
+          }
+        }
+      },
+      scales: {
+        x: { stacked: true, grid: { display: false }, title: { display: true, text: 'Período' } },
+        y: { stacked: true, ticks: { callback: function (v) { return sym + ' ' + v.toLocaleString('es-PE'); } }, title: { display: true, text: 'Monto' } }
+      }
+    }
+  });
+})();
+</script>
 {% endblock %}

@@ -1,14 +1,19 @@
 """Base de datos SQLite — FinanCuota. gorje."""
 
+import os
 import sqlite3
 from pathlib import Path
 
 
-DB_PATH = Path(__file__).resolve().parent / "financuota.db"
+_default_db = Path(__file__).resolve().parent / "financuota.db"
+_env_db = os.environ.get("FINANCUOTA_DB_PATH") or os.environ.get("DATABASE_PATH")
+DB_PATH = Path(_env_db).expanduser() if _env_db else _default_db
+if DB_PATH.parent:
+    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
 
 
 def get_conn() -> sqlite3.Connection:
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(DB_PATH, check_same_thread=False)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
     return conn
@@ -39,6 +44,7 @@ def init_db() -> None:
             usuario_login TEXT NOT NULL UNIQUE,
             password_hash TEXT NOT NULL,
             dni_usuario CHAR(8) NOT NULL UNIQUE,
+            rol TEXT NOT NULL DEFAULT 'usuario',
             created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
         );
 
@@ -81,6 +87,13 @@ def init_db() -> None:
             cuota_base REAL NOT NULL,
             total_financiado REAL NOT NULL,
             flujo_json TEXT NOT NULL,
+            modalidad TEXT NOT NULL DEFAULT 'Convencional',
+            cuota_balon_pct REAL NOT NULL DEFAULT 0,
+            cuota_balon_monto REAL NOT NULL DEFAULT 0,
+            gastos_notariales REAL NOT NULL DEFAULT 0,
+            gastos_registrales REAL NOT NULL DEFAULT 0,
+            costos_iniciales REAL NOT NULL DEFAULT 0,
+            tipo_cambio REAL,
             created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (id_cliente) REFERENCES cliente(id_cliente),
             FOREIGN KEY (id_vehiculo) REFERENCES vehiculo(id_vehiculo)
@@ -116,6 +129,7 @@ def init_db() -> None:
             cuota_total REAL NOT NULL,
             seguro_cuota REAL NOT NULL DEFAULT 0,
             portes_cuota REAL NOT NULL DEFAULT 0,
+            cuota_balon REAL NOT NULL DEFAULT 0,
             FOREIGN KEY (id_credito) REFERENCES credito(id_credito) ON DELETE CASCADE
         );
 
@@ -129,8 +143,27 @@ def init_db() -> None:
     if cur.fetchone():
         cur.execute("PRAGMA table_info(credito)")
         cols = [row[1] for row in cur.fetchall()]
-        if "periodo_tasa" not in cols:
-            cur.execute("ALTER TABLE credito ADD COLUMN periodo_tasa INTEGER DEFAULT 7")
+        credito_migrations = {
+            "periodo_tasa": "ALTER TABLE credito ADD COLUMN periodo_tasa INTEGER DEFAULT 7",
+            "modalidad": "ALTER TABLE credito ADD COLUMN modalidad TEXT DEFAULT 'Convencional'",
+            "cuota_balon_pct": "ALTER TABLE credito ADD COLUMN cuota_balon_pct REAL DEFAULT 0",
+            "cuota_balon_monto": "ALTER TABLE credito ADD COLUMN cuota_balon_monto REAL DEFAULT 0",
+            "gastos_notariales": "ALTER TABLE credito ADD COLUMN gastos_notariales REAL DEFAULT 0",
+            "gastos_registrales": "ALTER TABLE credito ADD COLUMN gastos_registrales REAL DEFAULT 0",
+            "costos_iniciales": "ALTER TABLE credito ADD COLUMN costos_iniciales REAL DEFAULT 0",
+            "tipo_cambio": "ALTER TABLE credito ADD COLUMN tipo_cambio REAL",
+        }
+        for col, sql in credito_migrations.items():
+            if col not in cols:
+                cur.execute(sql)
+        conn.commit()
+
+    cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='cronograma_pago'")
+    if cur.fetchone():
+        cur.execute("PRAGMA table_info(cronograma_pago)")
+        ccols = [row[1] for row in cur.fetchall()]
+        if "cuota_balon" not in ccols:
+            cur.execute("ALTER TABLE cronograma_pago ADD COLUMN cuota_balon REAL DEFAULT 0")
             conn.commit()
 
     cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='usuario'")
@@ -139,6 +172,9 @@ def init_db() -> None:
         ucols = [row[1] for row in cur.fetchall()]
         if "dni_usuario" not in ucols:
             cur.execute("ALTER TABLE usuario ADD COLUMN dni_usuario CHAR(8)")
+            conn.commit()
+        if "rol" not in ucols:
+            cur.execute("ALTER TABLE usuario ADD COLUMN rol TEXT NOT NULL DEFAULT 'usuario'")
             conn.commit()
 
     conn.close()

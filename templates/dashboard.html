@@ -1,122 +1,104 @@
-{% extends "base.html" %}
+{% extends "layout_app.html" %}
+{% block title %}Dashboard — FinanCuota{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+{% block topbar_actions %}
+<a href="{{ url_for('wizard') }}" class="btn btn-accent btn-sm" id="btn-new-sim">Nueva Simulación</a>
+{% endblock %}
 {% block content %}
-<h2>Hola, {{ username }}</h2>
-{% if dni_cuenta %}
-<p class="dni-badge">DNI de tu cuenta: <strong>{{ dni_cuenta }}</strong></p>
-{% endif %}
-<section class="grid">
-  <article class="card">
-    <h3>Nuevo plan de crédito</h3>
-    <form method="post" class="form-grid">
-      <label>Nombres<input name="nombres_cliente" required /></label>
-      <label>Apellidos<input name="apellidos_cliente" required /></label>
-      <label>Correo<input name="correo_cliente" type="email" /></label>
-      <label>Teléfono<input name="telefono_cliente" maxlength="9" /></label>
-      <label>Dirección<input name="direccion_cliente" /></label>
-      <label>Ingresos mensuales<input name="ingresos_mensuales" type="number" step="0.01" required /></label>
+<div class="stats-bar animate-in">
+  <div class="stat-item">
+    <div>
+      <div class="stat-number">{{ plans|length }}</div>
+      <div class="stat-label">Simulaciones</div>
+    </div>
+  </div>
+</div>
 
-      <label>Marca vehículo<input name="marca_vehiculo" required /></label>
-      <label>Modelo vehículo<input name="modelo_vehiculo" required /></label>
-      <label>Precio vehículo<input name="precio_vehiculo" type="number" step="0.01" required /></label>
-      <label>Cuota inicial (%)<input name="cuota_inicial_pct" type="number" step="0.01" value="20" required /></label>
-
-      <label>Moneda
-        <select name="moneda">
-          <option>Soles</option>
-          <option>Dólares</option>
-        </select>
-      </label>
-      <label>Tipo de tasa
-        <select name="tipo_tasa" id="tipo_tasa">
-          <option>Efectiva</option>
-          <option>Nominal</option>
-        </select>
-      </label>
-      <label id="wrap_periodo_tasa">¿En qué plazo viene tu tasa efectiva?
-        <select name="periodo_tasa">
-          <option value="0">Base 360 días</option>
-          <option value="1">Cada dos meses</option>
-          <option value="2">Mensual (ya es tasa al mes)</option>
-          <option value="3">Semestral</option>
-          <option value="4">Cuatrimestral</option>
-          <option value="5">Trimestral</option>
-          <option value="6">Bimestral</option>
-          <option value="7" selected>Anual (lo más habitual)</option>
-        </select>
-      </label>
-      <label>Porcentaje de la tasa (%)<input name="tasa_interes" type="number" step="0.0001" required placeholder="Ej. 12.5" /></label>
-      <label id="wrap_capitalizacion">Capitalizaciones al año (solo nominal)
-        <input name="capitalizacion" type="number" step="1" min="1" value="12" placeholder="12 = mensual" />
-      </label>
-
-      <details class="help-formulas">
-        <summary>Cómo convertimos la tasa a mensual (TEM)</summary>
-        <div class="formula-panel">
-          <p class="formula-title">Tasa efectiva anual → mensual</p>
-          <div class="formula-row" aria-label="TEM igual a raíz duodécima de uno más TEA menos uno">
-            <span class="formula-main">TEM</span>
-            <span class="formula-eq">=</span>
-            <span class="formula-main">(1 + TEA)<sup class="formula-sup">1⁄12</sup> − 1</span>
-          </div>
-          <p class="formula-note">Usa la opción <strong>Anual</strong> arriba cuando el banco te dé la TEA (ej. 12,5&nbsp;% al año).</p>
-          <p class="formula-title">Tasa nominal → primero TEA, luego mensual</p>
-          <div class="formula-row">
-            <span class="formula-main">TEA</span>
-            <span class="formula-eq">=</span>
-            <span class="formula-main">(1 + <span class="formula-fraction"><i>i</i>⁄<i>m</i></span>)<sup><i>m</i></sup> − 1</span>
-          </div>
-          <p class="formula-note"><i>i</i> = tasa nominal anual en decimal; <i>m</i> = veces que capitaliza al año (12 si es mensual).</p>
-        </div>
-      </details>
-      <label>Plazo (meses)<input name="plazo_meses" type="number" step="1" value="48" required /></label>
-      <label>Fecha de desembolso<input name="fecha_desembolso" type="date" required /></label>
-
-      <label>Periodo de gracia
-        <select name="periodo_gracia">
-          <option>Ninguno</option>
-          <option>Parcial</option>
-          <option>Total</option>
-        </select>
-      </label>
-      <label>Meses de gracia<input name="meses_gracia" type="number" step="1" value="0" /></label>
-      <label>Seguro desgravamen mensual (%)<input name="seguro_desgravamen" type="number" step="0.0001" value="0.03" required /></label>
-      <label>Seguro vehicular mensual (%)<input name="seguro_vehicular" type="number" step="0.0001" value="0.025" required /></label>
-      <label>Portes por cuota<input name="portes" type="number" step="0.01" value="4" required /></label>
-
-      <button type="submit">Generar plan</button>
-    </form>
-    <script>
-      (function () {
-        var tipo = document.getElementById("tipo_tasa");
-        var wrapP = document.getElementById("wrap_periodo_tasa");
-        var wrapC = document.getElementById("wrap_capitalizacion");
-        function sync() {
-          if (!tipo || !wrapP || !wrapC) return;
-          var nom = tipo.value === "Nominal";
-          wrapP.style.display = nom ? "none" : "";
-          wrapC.style.display = nom ? "" : "none";
-        }
-        tipo.addEventListener("change", sync);
-        sync();
-      })();
-    </script>
-  </article>
-
-  <article class="card">
-    <h3>Planes creados</h3>
+<div class="card animate-in" style="padding:0;overflow:hidden;">
+  <div style="padding:var(--space-5) var(--space-6);border-bottom:var(--border-light);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:var(--space-3);">
+    <h3 style="margin:0;font-size:var(--text-lg);color:var(--color-primary-900);">Simulaciones Guardadas</h3>
     {% if plans %}
-      <ul class="plan-list">
-        {% for plan in plans %}
-          <li>
-            <a href="{{ url_for('plan_detail', credito_id=plan.id) }}">
-              #{{ plan.id }} - {{ plan.nombre_cliente }} {{ plan.apellido_cliente }} | {{ plan.marca_vehiculo }} {{ plan.modelo_vehiculo }}
-            </a>
-          </li>
-        {% endfor %}
-      </ul>
-    {% else %}
-      <p>Aún no tienes planes.</p>
+    <input type="search" id="search-plans" class="form-input" placeholder="Buscar simulación…" style="max-width:260px;" />
     {% endif %}
-  </article>
-</section>
+  </div>
+
+  {% if plans %}
+  <div class="table-container" style="border:none;">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Cliente</th>
+          <th>Vehículo</th>
+          <th>Moneda</th>
+          <th>Modalidad</th>
+          <th>Desembolso</th>
+          <th style="text-align:right;">Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for plan in plans %}
+        <tr class="plan-row">
+          <td>{{ plan.id }}</td>
+          <td>{{ plan.nombre_cliente }} {{ plan.apellido_cliente }}</td>
+          <td>{{ plan.marca_vehiculo }} {{ plan.modelo_vehiculo }}</td>
+          <td><span class="badge badge-primary">{{ plan.moneda }}</span></td>
+          <td><span class="badge {% if plan.modalidad == 'Compra Inteligente' %}badge-accent{% else %}badge-primary{% endif %}">{{ plan.modalidad }}</span></td>
+          <td>{{ plan.fecha_desembolso or plan.created_at }}</td>
+          <td style="text-align:right;white-space:nowrap;">
+            <a href="{{ url_for('plan_detail', credito_id=plan.id) }}" class="btn btn-secondary btn-sm">Ver</a>
+            <button type="button" class="btn btn-danger btn-sm" onclick="confirmDelete({{ plan.id }}, '{{ plan.nombre_cliente }} {{ plan.apellido_cliente }}')">Eliminar</button>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty-state">
+    <div class="empty-state-icon">📋</div>
+    <div class="empty-state-title">Sin simulaciones aún</div>
+    <div class="empty-state-text">Crea tu primera simulación de crédito vehicular con el wizard paso a paso.</div>
+    <a href="{{ url_for('wizard') }}" class="btn btn-accent btn-lg">Crear simulación</a>
+  </div>
+  {% endif %}
+</div>
+
+<div class="modal-backdrop" id="delete-modal">
+  <div class="modal">
+    <h3 class="modal-title">¿Eliminar simulación?</h3>
+    <p class="modal-text" id="delete-modal-text">Esta acción no se puede deshacer.</p>
+    <form method="post" id="delete-form" action="">
+      <div class="modal-actions">
+        <button type="button" class="btn btn-secondary" onclick="closeDeleteModal()">Cancelar</button>
+        <button type="submit" class="btn btn-danger">Eliminar</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+{% block page_scripts %}
+<script>
+  var searchInput = document.getElementById('search-plans');
+  if (searchInput) {
+    searchInput.addEventListener('input', function () {
+      var q = this.value.toLowerCase();
+      document.querySelectorAll('.plan-row').forEach(function (row) {
+        row.style.display = row.textContent.toLowerCase().includes(q) ? '' : 'none';
+      });
+    });
+  }
+  function confirmDelete(id, name) {
+    document.getElementById('delete-modal-text').textContent =
+      'Se eliminará permanentemente la simulación de "' + name + '". Esta acción no se puede deshacer.';
+    document.getElementById('delete-form').action = '/plans/' + id + '/delete';
+    document.getElementById('delete-modal').classList.add('open');
+  }
+  function closeDeleteModal() {
+    document.getElementById('delete-modal').classList.remove('open');
+  }
+  document.getElementById('delete-modal').addEventListener('click', function (e) {
+    if (e.target === this) closeDeleteModal();
+  });
+</script>
 {% endblock %}

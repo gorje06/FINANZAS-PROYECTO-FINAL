@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="FinanCuota — Simulador profesional de crédito vehicular." />
+    <title>{% block title %}FinanCuota{% endblock %}</title>
+    <link rel="icon" href="{{ url_for('static', filename='financuota-logo-informe-upc.png') }}" />
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}" />
+  </head>
+  <body>
+    <div class="auth-page">
+      <div class="auth-brand">
+        <img class="auth-brand-logo brand-logo-img" src="{{ url_for('static', filename='financuota-logo-informe-upc.png') }}" alt="FinanCuota" />
+        <h1 class="auth-brand-title">FinanCuota</h1>
+        <p class="auth-brand-subtitle">{% block auth_subtitle %}Simulador profesional de crédito vehicular. Método francés, indicadores financieros y cronograma de pagos.{% endblock %}</p>
+      </div>
+      <div class="auth-form-side">
+        <div class="auth-form-container">
+          {% with messages = get_flashed_messages() %}
+          {% if messages %}
+          <div class="flash-messages" style="margin-bottom:var(--space-4);">
+            {% for m in messages %}
+            <div class="flash flash-error" style="padding:var(--space-3);border-radius:var(--radius-md);background:var(--color-danger-100);color:var(--color-danger-600);font-size:var(--text-sm);margin-bottom:var(--space-2);">{{ m }}</div>
+            {% endfor %}
+          </div>
+          {% endif %}
+          {% endwith %}
+          {% block auth_content %}{% endblock %}
+        </div>
+      </div>
+    </div>
+    {% block auth_scripts %}{% endblock %}
+  </body>
+</html>

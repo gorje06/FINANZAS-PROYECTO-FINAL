@@ -1,31 +1,43 @@
-{% extends "base.html" %}
-{% block content %}
-<section class="card auth">
-  <h2>Registro</h2>
-  <form method="post">
-    <label>Usuario <input name="username" autocomplete="username" minlength="3" maxlength="50" required /></label>
-    <label>DNI (8 dígitos) <input name="dni_usuario" inputmode="numeric" pattern="\d{8}" maxlength="8" minlength="8" required /></label>
-    <label>Contraseña <input id="reg_password" name="password" type="password" autocomplete="new-password" minlength="6" required /></label>
-    <label>Repetir contraseña <input id="reg_password_confirm" name="password_confirm" type="password" autocomplete="new-password" minlength="6" required /></label>
-    <label class="auth-checkbox-row">
-      <input type="checkbox" id="reg_show_password" />
-      Mostrar contraseñas
-    </label>
-    <button type="submit">Crear cuenta</button>
-  </form>
-  <p>¿Ya tienes cuenta? <a href="{{ url_for('login') }}">Inicia sesión</a></p>
-  <script>
-    (function () {
-      var cb = document.getElementById("reg_show_password");
-      var a = document.getElementById("reg_password");
-      var b = document.getElementById("reg_password_confirm");
-      if (!cb || !a || !b) return;
-      cb.addEventListener("change", function () {
-        var t = cb.checked ? "text" : "password";
-        a.type = t;
-        b.type = t;
-      });
-    })();
-  </script>
-</section>
+{% extends "layout_auth.html" %}
+{% from "macros.html" import help_tip, field_error %}
+{% block title %}Registro — FinanCuota{% endblock %}
+{% block auth_subtitle %}Crea tu cuenta para simular créditos vehiculares con el método francés vencido ordinario.{% endblock %}
+{% block auth_content %}
+<h2 class="auth-form-title">Crear Cuenta</h2>
+<p class="auth-form-subtitle">Completa los datos para registrarte</p>
+<form method="post" class="auth-form" id="register-form" novalidate>
+  <div class="form-group">
+    <label class="form-label" for="username">Usuario <span class="required">*</span> {{ help_tip('Nombre de usuario para iniciar sesión. Entre 3 y 50 caracteres. Ejemplo: jperez') }}</label>
+    <input class="form-input" id="username" name="username" autocomplete="username" minlength="3" maxlength="50" required />
+    {{ field_error('err-username') }}
+  </div>
+  <div class="form-group">
+    <label class="form-label" for="dni_usuario">DNI <span class="required">*</span> {{ help_tip('Documento Nacional de Identidad peruano. Exactamente 8 dígitos numéricos. Ejemplo: 72345678') }}</label>
+    <input class="form-input" id="dni_usuario" name="dni_usuario" inputmode="numeric" pattern="\d{8}" maxlength="8" minlength="8" required />
+    {{ field_error('err-dni') }}
+  </div>
+  <div class="form-group">
+    <label class="form-label" for="reg_password">Contraseña <span class="required">*</span></label>
+    <input class="form-input" id="reg_password" name="password" type="password" autocomplete="new-password" minlength="6" required />
+    {{ field_error('err-password') }}
+  </div>
+  <div class="form-group">
+    <label class="form-label" for="reg_password_confirm">Repetir contraseña <span class="required">*</span></label>
+    <input class="form-input" id="reg_password_confirm" name="password_confirm" type="password" autocomplete="new-password" minlength="6" required />
+    {{ field_error('err-password2') }}
+  </div>
+  <label class="auth-checkbox-row">
+    <input type="checkbox" id="reg_show_password" />
+    Mostrar contraseñas
+  </label>
+  <button type="submit" class="btn btn-accent">Crear cuenta</button>
+</form>
+<p class="auth-links">¿Ya tienes cuenta? <a href="{{ url_for('login') }}">Inicia sesión</a></p>
+{% endblock %}
+{% block auth_scripts %}
+<script src="{{ url_for('static', filename='forms.js') }}"></script>
+<script>
+  initPasswordToggle('reg_show_password', ['reg_password', 'reg_password_confirm']);
+  bindRegisterForm('register-form');
+</script>
 {% endblock %}

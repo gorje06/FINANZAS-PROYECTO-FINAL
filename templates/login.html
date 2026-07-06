@@ -1,26 +1,36 @@
-{% extends "base.html" %}
-{% block content %}
-<section class="card auth">
-  <h2>Iniciar sesión</h2>
-  <form method="post">
-    <label>Usuario <input name="username" required /></label>
-    <label>Contraseña <input id="login_password" name="password" type="password" required /></label>
-    <label class="auth-checkbox-row">
-      <input type="checkbox" id="login_show_password" />
-      Mostrar contraseña
-    </label>
-    <button type="submit">Ingresar</button>
-  </form>
-  <p>¿No tienes cuenta? <a href="{{ url_for('register') }}">Regístrate</a></p>
-  <script>
-    (function () {
-      var cb = document.getElementById("login_show_password");
-      var pw = document.getElementById("login_password");
-      if (!cb || !pw) return;
-      cb.addEventListener("change", function () {
-        pw.type = cb.checked ? "text" : "password";
-      });
-    })();
-  </script>
-</section>
+{% extends "layout_auth.html" %}
+{% from "macros.html" import help_tip, field_error %}
+{% block title %}Iniciar Sesión — FinanCuota{% endblock %}
+{% block auth_subtitle %}Simulador profesional de crédito vehicular. Método francés, indicadores financieros y cronograma de pagos.{% endblock %}
+{% block auth_content %}
+<h2 class="auth-form-title">Bienvenido</h2>
+<p class="auth-form-subtitle">Ingresa tus credenciales para continuar</p>
+<form method="post" class="auth-form" id="login-form" novalidate>
+  <div class="form-group">
+    <label class="form-label" for="username">Usuario <span class="required">*</span></label>
+    <input class="form-input" id="username" name="username" autocomplete="username" required placeholder="Ingresa tu usuario" />
+    {{ field_error('err-username') }}
+  </div>
+  <div class="form-group">
+    <label class="form-label" for="login_password">Contraseña <span class="required">*</span></label>
+    <input class="form-input" id="login_password" name="password" type="password" autocomplete="current-password" required placeholder="Ingresa tu contraseña" />
+    {{ field_error('err-password') }}
+  </div>
+  <label class="auth-checkbox-row">
+    <input type="checkbox" id="login_show_password" />
+    Mostrar contraseña
+  </label>
+  <button type="submit" class="btn btn-accent">Ingresar</button>
+</form>
+<p class="auth-links">¿No tienes cuenta? <a href="{{ url_for('register') }}">Regístrate aquí</a></p>
+{% endblock %}
+{% block auth_scripts %}
+<script src="{{ url_for('static', filename='forms.js') }}"></script>
+<script>
+  initPasswordToggle('login_show_password', 'login_password');
+  bindRequiredForm('login-form', {
+    username: { min: 1, msg: 'Ingresa tu usuario' },
+    password: { min: 1, msg: 'Ingresa tu contraseña' }
+  });
+</script>
 {% endblock %}
