@@ -58,6 +58,20 @@ class TursoCursor:
         self._rows = []
         return rows
 
+    def execute(self, sql: str, params: tuple | list = ()):
+        self._execute(sql, params)
+        return self
+
+    def executemany(self, sql: str, seq_of_params):
+        for params in seq_of_params:
+            self._execute(sql, params)
+        return self
+
+    def executescript(self, script: str) -> "TursoCursor":
+        for statement in _split_sql_script(script):
+            self._execute(statement, ())
+        return self
+
 
 class TursoConnection:
     def __init__(self, database_url: str, auth_token: str):

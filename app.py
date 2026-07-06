@@ -11,7 +11,7 @@ from functools import wraps
 from flask import Flask, Response, flash, redirect, render_template, request, session, url_for
 from werkzeug.security import check_password_hash, generate_password_hash
 
-from db import DB_PATH, database_backend, export_database_file, export_database_sql, get_conn, init_db
+from db import DB_PATH, get_conn, init_db
 from finance import MODALIDAD_COMPRA_INTELIGENTE, MODALIDAD_CONVENCIONAL, build_schedule
 
 
@@ -1046,30 +1046,7 @@ def admin_panel():
         por_moneda=por_moneda,
         creditos=creditos,
         usuarios=usuarios,
-        db_backend=database_backend(),
         active_nav="admin",
-    )
-
-
-@app.get("/admin/export-db")
-@admin_required
-def admin_export_db():
-    fmt = request.args.get("format", "sql").strip().lower()
-    if fmt == "db":
-        data, filename = export_database_file()
-        if not data:
-            flash("La exportación .db solo está disponible con SQLite local (sin Turso).")
-            return redirect(url_for("admin_panel"))
-        return Response(
-            data,
-            mimetype="application/x-sqlite3",
-            headers={"Content-Disposition": f"attachment; filename={filename}"},
-        )
-    sql_text, filename = export_database_sql()
-    return Response(
-        sql_text,
-        mimetype="application/sql; charset=utf-8",
-        headers={"Content-Disposition": f"attachment; filename={filename}"},
     )
 
 

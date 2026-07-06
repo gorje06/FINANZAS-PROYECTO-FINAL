@@ -50,16 +50,6 @@ Sigue siendo SQLite. No es Postgres.
 
 
 ================================================================================
-  PASO 4 — Exportar BD (panel admin)
-================================================================================
-
-1. Login como admin
-2. Administracion -> seccion "Base de datos"
-3. Exportar SQL (.sql) -> respaldo completo
-4. En local tambien puedes exportar .db
-
-
-================================================================================
   Si el servicio no existe aun en Render
 ================================================================================
 

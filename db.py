@@ -2,7 +2,6 @@
 
 import os
 import sqlite3
-from datetime import date
 from pathlib import Path
 from typing import Any
 
@@ -31,67 +30,6 @@ def get_conn() -> Any:
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
     return conn
-
-
-def export_database_sql() -> tuple[str, str]:
-    conn = get_conn()
-    try:
-        if hasattr(conn, "iterdump"):
-            sql = "\n".join(conn.iterdump())
-        else:
-            sql = _dump_sql_manual(conn)
-        return sql, f"financuota_backup_{date.today().isoformat()}.sql"
-    finally:
-        conn.close()
-
-
-def export_database_file() -> tuple[bytes | None, str]:
-    if USE_TURSO or not DB_PATH.is_file():
-        return None, ""
-    return DB_PATH.read_bytes(), f"financuota_backup_{date.today().isoformat()}.db"
-
-
-def _dump_sql_manual(conn) -> str:
-    lines = ["PRAGMA foreign_keys=OFF;", "BEGIN TRANSACTION;"]
-    tables = conn.execute(
-        """
-        SELECT name FROM sqlite_master
-        WHERE type='table' AND name NOT LIKE 'sqlite_%'
-        ORDER BY name
-        """
-    ).fetchall()
-    for table_row in tables:
-        name = table_row[0] if not hasattr(table_row, "keys") else table_row["name"]
-        ddl = conn.execute(
-            "SELECT sql FROM sqlite_master WHERE type='table' AND name=?",
-            (name,),
-        ).fetchone()
-        ddl_sql = ddl[0] if ddl else None
-        if ddl_sql:
-            lines.append(f"{ddl_sql};")
-        rows = conn.execute(f"SELECT * FROM {name}").fetchall()
-        if not rows:
-            continue
-        columns = rows[0].keys() if hasattr(rows[0], "keys") else []
-        if not columns:
-            continue
-        col_list = ", ".join(columns)
-        placeholders = ", ".join("?" for _ in columns)
-        for row in rows:
-            values = [row[col] for col in columns]
-            quoted = ", ".join(_sql_literal(v) for v in values)
-            lines.append(f"INSERT INTO {name} ({col_list}) VALUES ({quoted});")
-    lines.append("COMMIT;")
-    return "\n".join(lines)
-
-
-def _sql_literal(value) -> str:
-    if value is None:
-        return "NULL"
-    if isinstance(value, (int, float)):
-        return str(value)
-    escaped = str(value).replace("'", "''")
-    return f"'{escaped}'"
 
 
 def init_db() -> None:
