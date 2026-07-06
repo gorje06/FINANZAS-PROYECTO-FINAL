@@ -2,10 +2,25 @@
 
 from __future__ import annotations
 
+import base64
 import json
 import urllib.error
 import urllib.request
 from typing import Any
+
+
+def _turso_arg(value: Any) -> dict:
+    if value is None:
+        return {"type": "null"}
+    if isinstance(value, bool):
+        return {"type": "integer", "value": "1" if value else "0"}
+    if isinstance(value, int):
+        return {"type": "integer", "value": str(value)}
+    if isinstance(value, float):
+        return {"type": "float", "value": repr(value)}
+    if isinstance(value, (bytes, bytearray)):
+        return {"type": "blob", "base64": base64.b64encode(value).decode("ascii")}
+    return {"type": "text", "value": str(value)}
 
 
 def _normalize_cell(value: Any) -> Any:
@@ -43,7 +58,15 @@ class TursoCursor:
 
     def _execute(self, sql: str, params: tuple | list) -> None:
         result = self.connection._pipeline(
-            [{"type": "execute", "stmt": {"sql": sql, "args": list(params)}}]
+            [
+                {
+                    "type": "execute",
+                    "stmt": {
+                        "sql": sql,
+                        "args": [_turso_arg(v) for v in params],
+                    },
+                }
+            ]
         )
         payload = result[0]
         if payload.get("type") != "ok":
@@ -51,8 +74,8 @@ class TursoCursor:
             raise RuntimeError(f"Turso error: {error}")
         body = payload["response"]["result"]
         self.rowcount = int(body.get("affected_row_count") or 0)
-        last_id = body.get("last_insert_rowid")
-        self.lastrowid = int(last_id) if last_id is not None else None
+        last_id = _normalize_cell(body.get("last_insert_rowid"))
+        self.lastrowid = int(last_id) if last_id is not None and last_id != "" else None
         cols = [c["name"] for c in body.get("cols") or []]
         raw_rows = body.get("rows") or []
         self._rows = [TursoRow(cols, row) for row in raw_rows] if cols else []
