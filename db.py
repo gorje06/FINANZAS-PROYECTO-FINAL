@@ -177,4 +177,287 @@ def init_db() -> None:
             cur.execute("ALTER TABLE usuario ADD COLUMN rol TEXT NOT NULL DEFAULT 'usuario'")
             conn.commit()
 
+    cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='catalogo_vehiculo'")
+    if not cur.fetchone():
+        cur.executescript(
+            """
+            CREATE TABLE catalogo_vehiculo (
+                id_catalogo INTEGER PRIMARY KEY AUTOINCREMENT,
+                marca TEXT NOT NULL,
+                modelo TEXT NOT NULL,
+                anio INTEGER NOT NULL,
+                variante TEXT NOT NULL,
+                categoria TEXT NOT NULL,
+                combustible TEXT NOT NULL DEFAULT 'Gasolina',
+                condicion TEXT NOT NULL DEFAULT 'Nuevo',
+                descripcion TEXT,
+                precio REAL NOT NULL,
+                imagen_url TEXT,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+            CREATE INDEX idx_catalogo_categoria ON catalogo_vehiculo(categoria);
+            """
+        )
+        conn.commit()
+
+    _seed_catalogo(conn)
+    _sync_catalogo_data(conn)
+
     conn.close()
+
+
+CATALOGO_VEHICULOS = [
+    {
+        "marca": "BMW",
+        "modelo": "M3",
+        "anio": 2025,
+        "variante": "Competition M xDrive",
+        "categoria": "Deportivo",
+        "combustible": "Gasolina",
+        "condicion": "Nuevo",
+        "descripcion": (
+            "Sedán deportivo de altas prestaciones con motor biturbo de 6 cilindros en línea, "
+            "510 HP y tracción integral xDrive. Transmisión automática de 8 velocidades, "
+            "frenos M Compound y paquete aerodinámico M. Ideal para quien busca máximo "
+            "rendimiento con uso diario."
+        ),
+        "precio": 380000.0,
+        "imagen": "bmw-m3.jpg",
+    },
+    {
+        "marca": "Chevrolet",
+        "modelo": "Camaro",
+        "anio": 2024,
+        "variante": "SS 6.2L V8",
+        "categoria": "Deportivo",
+        "combustible": "Gasolina",
+        "condicion": "Nuevo",
+        "descripcion": (
+            "Muscle car americano con motor V8 atmosférico de 6.2 L y 455 HP. "
+            "Tracción trasera, caja automática de 10 velocidades y modo de manejo deportivo. "
+            "Diseño agresivo con amplio equipamiento de seguridad activa."
+        ),
+        "precio": 285000.0,
+        "imagen": "camaro.jpg",
+    },
+    {
+        "marca": "Ford",
+        "modelo": "Mustang",
+        "anio": 2024,
+        "variante": "GT Premium 5.0 V8",
+        "categoria": "Deportivo",
+        "combustible": "Gasolina",
+        "condicion": "Nuevo",
+        "descripcion": (
+            "Ícono deportivo con motor Coyote V8 de 5.0 L, 486 HP y escape activo. "
+            "Versión Premium con cuero, pantalla central de 13.4\" y asistencias Ford Co-Pilot360. "
+            "Experiencia de conducción pura con tecnología moderna."
+        ),
+        "precio": 310000.0,
+        "imagen": "mustang.jpg",
+    },
+    {
+        "marca": "Porsche",
+        "modelo": "911",
+        "anio": 2024,
+        "variante": "Carrera S",
+        "categoria": "Deportivo",
+        "combustible": "Gasolina",
+        "condicion": "Nuevo",
+        "descripcion": (
+            "Deportivo de motor trasero con 443 HP, chasis deportivo y tracción trasera. "
+            "Acabado premium en cuero, sistema PCM con navegación y paquete Sport Chrono. "
+            "Referente en prestaciones y valor de reventa en el segmento premium."
+        ),
+        "precio": 598000.0,
+        "imagen": "porsche-911.jpg",
+    },
+    {
+        "marca": "Toyota",
+        "modelo": "RAV4",
+        "anio": 2025,
+        "variante": "XLE Hybrid",
+        "categoria": "SUV",
+        "combustible": "Híbrido",
+        "condicion": "Nuevo",
+        "descripcion": (
+            "SUV compacto híbrido con motor 2.5 L y sistema e-CVT. Consumo eficiente, "
+            "tracción AWD-i y Toyota Safety Sense de serie. Amplio maletero y excelente "
+            "reventa; opción familiar muy demandada en Perú."
+        ),
+        "precio": 168900.0,
+        "imagen": "rav4.jpg",
+    },
+    {
+        "marca": "Hyundai",
+        "modelo": "Tucson",
+        "anio": 2024,
+        "variante": "Limited AWD",
+        "categoria": "SUV",
+        "combustible": "Gasolina",
+        "condicion": "Nuevo",
+        "descripcion": (
+            "SUV mediano con diseño paramétrico, motor 2.5 L y tracción integral HTRAC. "
+            "Pantalla curva de 12.3\", techo panorámico y asistencias Hyundai SmartSense. "
+            "Relación equipamiento-precio competitiva en su segmento."
+        ),
+        "precio": 142500.0,
+        "imagen": "tucson.jpg",
+    },
+    {
+        "marca": "Mazda",
+        "modelo": "CX-5",
+        "anio": 2025,
+        "variante": "Grand Touring",
+        "categoria": "SUV",
+        "combustible": "Gasolina",
+        "condicion": "Nuevo",
+        "descripcion": (
+            "SUV premium con motor Skyactiv-G 2.5 L turbo, 256 HP y acabados en cuero Nappa. "
+            "Manejo dinámico G-Vectoring Plus y sistema i-Activsense. Enfoque en "
+            "conducción placentera y diseño elegante."
+        ),
+        "precio": 155800.0,
+        "imagen": "cx5.jpg",
+    },
+    {
+        "marca": "Kia",
+        "modelo": "Sportage",
+        "anio": 2024,
+        "variante": "EX Plus",
+        "categoria": "SUV",
+        "combustible": "Gasolina",
+        "condicion": "Nuevo",
+        "descripcion": (
+            "SUV versátil con motor 2.0 L, pantallas duales de 12.3\" y conectividad inalámbrica. "
+            "Paquete de asistencias Drive Wise y garantía de fábrica extendida. "
+            "Buena opción urbana con espacio para familia."
+        ),
+        "precio": 134900.0,
+        "imagen": "sportage.jpg",
+    },
+    {
+        "marca": "Toyota",
+        "modelo": "Corolla",
+        "anio": 2026,
+        "variante": "XEI 1.8",
+        "categoria": "Sedán",
+        "combustible": "Gasolina",
+        "condicion": "Nuevo",
+        "descripcion": (
+            "Sedán confiable con motor 1.8 L, transmisión CVT y bajo costo de mantenimiento. "
+            "Toyota Safety Sense, amplio espacio trasero y excelente reventa. "
+            "Vehículo del caso de prueba Carlos Ramírez (S/ 85,000 — informe cap. 3.4)."
+        ),
+        "precio": 85000.0,
+        "imagen": "corolla.jpg",
+    },
+    {
+        "marca": "Honda",
+        "modelo": "Civic",
+        "anio": 2025,
+        "variante": "Touring 1.5 Turbo",
+        "categoria": "Sedán",
+        "combustible": "Gasolina",
+        "condicion": "Nuevo",
+        "descripcion": (
+            "Sedán compacto deportivo con turbo 1.5 L, 180 HP y transmisión CVT. "
+            "Honda Sensing, asientos de cuero y audio Bose de 12 bocinas. "
+            "Equilibrio entre deportividad y eficiencia para uso diario."
+        ),
+        "precio": 128500.0,
+        "imagen": "civic.jpg",
+    },
+    {
+        "marca": "Hyundai",
+        "modelo": "Elantra",
+        "anio": 2024,
+        "variante": "GL 2.0",
+        "categoria": "Sedán",
+        "combustible": "Gasolina",
+        "condicion": "Nuevo",
+        "descripcion": (
+            "Sedán accesible con motor 2.0 L, diseño moderno y garantía de 5 años. "
+            "Buen equipamiento de serie: cámara de retroceso, control de crucero y "
+            "conectividad Apple CarPlay / Android Auto."
+        ),
+        "precio": 94900.0,
+        "imagen": "elantra.jpg",
+    },
+    {
+        "marca": "Nissan",
+        "modelo": "Sentra",
+        "anio": 2025,
+        "variante": "Advance 2.0",
+        "categoria": "Sedán",
+        "combustible": "Gasolina",
+        "condicion": "Nuevo",
+        "descripcion": (
+            "Sedán familiar con motor 2.0 L, maletero amplio y suspensión confortable. "
+            "Nissan Safety Shield 360 y pantalla táctil de 8\". Opción práctica para "
+            "trabajo y familia con cuotas accesibles."
+        ),
+        "precio": 98900.0,
+        "imagen": "sentra.jpg",
+    },
+]
+
+
+def _catalogo_row_tuple(item: dict) -> tuple:
+    return (
+        item["marca"],
+        item["modelo"],
+        item["anio"],
+        item["variante"],
+        item["categoria"],
+        item["combustible"],
+        item["condicion"],
+        item["descripcion"],
+        item["precio"],
+        f"/static/catalog/{item['imagen']}",
+    )
+
+
+def _seed_catalogo(conn: sqlite3.Connection) -> None:
+    count = conn.execute("SELECT COUNT(*) AS n FROM catalogo_vehiculo").fetchone()["n"]
+    if count:
+        return
+    conn.executemany(
+        """
+        INSERT INTO catalogo_vehiculo (
+            marca, modelo, anio, variante, categoria, combustible, condicion,
+            descripcion, precio, imagen_url
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        [_catalogo_row_tuple(v) for v in CATALOGO_VEHICULOS],
+    )
+    conn.commit()
+
+
+def _sync_catalogo_data(conn: sqlite3.Connection) -> None:
+    """Actualiza precios, fotos y descripciones del catálogo base."""
+    for item in CATALOGO_VEHICULOS:
+        marca, modelo, anio, variante, categoria, combustible, condicion, descripcion, precio, imagen_url = (
+            _catalogo_row_tuple(item)
+        )
+        conn.execute(
+            """
+            UPDATE catalogo_vehiculo SET
+                anio=?, variante=?, categoria=?, combustible=?, condicion=?,
+                descripcion=?, precio=?, imagen_url=?
+            WHERE marca=? AND modelo=?
+            """,
+            (
+                anio,
+                variante,
+                categoria,
+                combustible,
+                condicion,
+                descripcion,
+                precio,
+                imagen_url,
+                marca,
+                modelo,
+            ),
+        )
+    conn.commit()

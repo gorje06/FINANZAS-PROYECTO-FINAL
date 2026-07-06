@@ -694,6 +694,206 @@ def _create_credito(uid: int, data: dict) -> int:
     return id_credito
 
 
+CATEGORIAS_CATALOGO = ("SUV", "Sedán", "Deportivo")
+COMBUSTIBLES_CATALOGO = ("Gasolina", "Híbrido", "Eléctrico", "Diésel")
+CONDICIONES_CATALOGO = ("Nuevo", "Seminuevo")
+
+
+def _list_catalogo():
+    conn = get_conn()
+    rows = conn.execute(
+        """
+        SELECT id_catalogo, marca, modelo, anio, variante, categoria, combustible,
+               condicion, descripcion, precio, imagen_url
+        FROM catalogo_vehiculo
+        ORDER BY categoria ASC, marca ASC, modelo ASC
+        """
+    ).fetchall()
+    conn.close()
+    return rows
+
+
+def _get_catalogo_item(catalogo_id: int):
+    conn = get_conn()
+    row = conn.execute(
+        "SELECT * FROM catalogo_vehiculo WHERE id_catalogo = ?", (catalogo_id,)
+    ).fetchone()
+    conn.close()
+    return row
+
+
+def _match_catalogo_id(marca: str, modelo: str, precio=None) -> int | None:
+    conn = get_conn()
+    modelo_base = modelo.split()[0] if modelo else ""
+    row = conn.execute(
+        """
+        SELECT id_catalogo FROM catalogo_vehiculo
+        WHERE marca = ? AND (modelo = ? OR modelo = ? OR ? LIKE modelo || '%')
+        ORDER BY id_catalogo ASC LIMIT 1
+        """,
+        (marca.strip(), modelo.strip(), modelo_base, modelo.strip()),
+    ).fetchone()
+    if not row and precio:
+        try:
+            row = conn.execute(
+                """
+                SELECT id_catalogo FROM catalogo_vehiculo
+                WHERE marca = ? AND ABS(precio - ?) < 0.01
+                ORDER BY id_catalogo ASC LIMIT 1
+                """,
+                (marca.strip(), float(precio)),
+            ).fetchone()
+        except (TypeError, ValueError):
+            pass
+    conn.close()
+    return row["id_catalogo"] if row else None
+
+
+def _parse_catalogo_form(form) -> dict:
+    marca = form.get("marca", "").strip()
+    modelo = form.get("modelo", "").strip()
+    variante = form.get("variante", "").strip()
+    categoria = form.get("categoria", "").strip()
+    combustible = form.get("combustible", "Gasolina").strip()
+    condicion = form.get("condicion", "Nuevo").strip()
+    descripcion = form.get("descripcion", "").strip()
+    imagen_url = form.get("imagen_url", "").strip()
+    try:
+        anio = int(form.get("anio", "0"))
+        precio = float(form.get("precio", "0"))
+    except ValueError as exc:
+        raise ValueError("Año y precio deben ser numéricos.") from exc
+    if not marca or not modelo or not variante:
+        raise ValueError("Marca, modelo y variante son obligatorios.")
+    if categoria not in CATEGORIAS_CATALOGO:
+        raise ValueError("Categoría inválida.")
+    if anio < 1990 or anio > 2035:
+        raise ValueError("Año del vehículo fuera de rango.")
+    if precio <= 0:
+        raise ValueError("El precio debe ser mayor a cero.")
+    return {
+        "marca": marca,
+        "modelo": modelo,
+        "anio": anio,
+        "variante": variante,
+        "categoria": categoria,
+        "combustible": combustible,
+        "condicion": condicion,
+        "descripcion": descripcion,
+        "precio": precio,
+        "imagen_url": imagen_url or None,
+    }
+
+
+@app.get("/catalogo")
+@login_required
+def catalogo():
+    return render_template(
+        "catalogo.html",
+        vehiculos=_list_catalogo(),
+        categorias=CATEGORIAS_CATALOGO,
+        combustibles=COMBUSTIBLES_CATALOGO,
+        condiciones=CONDICIONES_CATALOGO,
+        active_nav="catalogo",
+    )
+
+
+@app.post("/catalogo")
+@login_required
+def catalogo_create():
+    try:
+        data = _parse_catalogo_form(request.form)
+        conn = get_conn()
+        conn.execute(
+            """
+            INSERT INTO catalogo_vehiculo (
+                marca, modelo, anio, variante, categoria, combustible, condicion,
+                descripcion, precio, imagen_url
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                data["marca"],
+                data["modelo"],
+                data["anio"],
+                data["variante"],
+                data["categoria"],
+                data["combustible"],
+                data["condicion"],
+                data["descripcion"],
+                data["precio"],
+                data["imagen_url"],
+            ),
+        )
+        conn.commit()
+        conn.close()
+        flash(f"Vehículo {data['marca']} {data['modelo']} agregado al catálogo.")
+    except Exception as exc:
+        flash(str(exc))
+    return redirect(url_for("catalogo"))
+
+
+@app.post("/catalogo/<int:catalogo_id>/editar")
+@login_required
+def catalogo_update(catalogo_id: int):
+    try:
+        data = _parse_catalogo_form(request.form)
+        conn = get_conn()
+        row = conn.execute(
+            "SELECT id_catalogo FROM catalogo_vehiculo WHERE id_catalogo = ?",
+            (catalogo_id,),
+        ).fetchone()
+        if not row:
+            conn.close()
+            flash("Vehículo no encontrado.")
+            return redirect(url_for("catalogo"))
+        conn.execute(
+            """
+            UPDATE catalogo_vehiculo SET
+                marca=?, modelo=?, anio=?, variante=?, categoria=?, combustible=?,
+                condicion=?, descripcion=?, precio=?, imagen_url=?
+            WHERE id_catalogo=?
+            """,
+            (
+                data["marca"],
+                data["modelo"],
+                data["anio"],
+                data["variante"],
+                data["categoria"],
+                data["combustible"],
+                data["condicion"],
+                data["descripcion"],
+                data["precio"],
+                data["imagen_url"],
+                catalogo_id,
+            ),
+        )
+        conn.commit()
+        conn.close()
+        flash("Vehículo actualizado.")
+    except Exception as exc:
+        flash(str(exc))
+    return redirect(url_for("catalogo"))
+
+
+@app.post("/catalogo/<int:catalogo_id>/eliminar")
+@login_required
+def catalogo_delete(catalogo_id: int):
+    conn = get_conn()
+    row = conn.execute(
+        "SELECT marca, modelo FROM catalogo_vehiculo WHERE id_catalogo = ?",
+        (catalogo_id,),
+    ).fetchone()
+    if not row:
+        conn.close()
+        flash("Vehículo no encontrado.")
+        return redirect(url_for("catalogo"))
+    conn.execute("DELETE FROM catalogo_vehiculo WHERE id_catalogo = ?", (catalogo_id,))
+    conn.commit()
+    conn.close()
+    flash(f"{row['marca']} {row['modelo']} eliminado del catálogo.")
+    return redirect(url_for("catalogo"))
+
+
 @app.get("/dashboard")
 @login_required
 def dashboard():
@@ -719,9 +919,36 @@ def wizard():
     if caso in CASOS_PRUEBA:
         defaults.update(CASOS_PRUEBA[caso])
         flash(f"Caso de prueba cargado: {caso.title()}.")
+    catalogo_id = request.args.get("catalogo", type=int)
+    selected_catalogo_id = catalogo_id
+    if catalogo_id:
+        item = _get_catalogo_item(catalogo_id)
+        if item:
+            defaults.update(
+                {
+                    "catalogo_id": str(catalogo_id),
+                    "marca_vehiculo": item["marca"],
+                    "modelo_vehiculo": f"{item['modelo']} {item['anio']}",
+                    "precio_vehiculo": str(item["precio"]),
+                }
+            )
+            flash(f"Vehículo cargado: {item['marca']} {item['modelo']}.")
+        else:
+            flash("Vehículo del catálogo no encontrado.")
+    elif defaults.get("marca_vehiculo") and defaults.get("modelo_vehiculo"):
+        selected_catalogo_id = _match_catalogo_id(
+            defaults.get("marca_vehiculo", ""),
+            defaults.get("modelo_vehiculo", ""),
+            defaults.get("precio_vehiculo"),
+        )
+        if selected_catalogo_id:
+            defaults["catalogo_id"] = str(selected_catalogo_id)
+    catalogo_list = _list_catalogo()
     return render_template(
         "wizard.html",
         defaults=defaults,
+        catalogo=catalogo_list,
+        selected_catalogo_id=selected_catalogo_id,
         periodo_opciones=PERIODO_OPCIONES,
         active_nav="wizard",
         modalidades=(MODALIDAD_CONVENCIONAL, MODALIDAD_COMPRA_INTELIGENTE),

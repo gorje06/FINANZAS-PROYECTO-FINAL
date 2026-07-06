@@ -58,21 +58,84 @@
     </div>
 
     <div class="wizard-panel" data-step="1">
-      <h3 style="margin-bottom:var(--space-5);color:var(--color-primary-900);">Datos del vehículo</h3>
-      <div class="form-row">
-        <div class="form-group">
-          <label class="form-label">Marca <span class="required">*</span></label>
-          <input class="form-input" name="marca_vehiculo" required value="{{ defaults.get('marca_vehiculo','') }}" />
-        </div>
-        <div class="form-group">
-          <label class="form-label">Modelo <span class="required">*</span></label>
-          <input class="form-input" name="modelo_vehiculo" required value="{{ defaults.get('modelo_vehiculo','') }}" />
+      <h3 style="margin-bottom:var(--space-2);color:var(--color-primary-900);">Selecciona el vehículo del catálogo</h3>
+      <p style="font-size:var(--text-sm);color:var(--color-neutral-600);margin-bottom:var(--space-5);">
+        El precio se vincula automáticamente al catálogo. Solo ajusta la cuota inicial.
+      </p>
+
+      <input type="hidden" name="marca_vehiculo" id="marca_vehiculo" value="{{ defaults.get('marca_vehiculo','') }}" />
+      <input type="hidden" name="modelo_vehiculo" id="modelo_vehiculo" value="{{ defaults.get('modelo_vehiculo','') }}" />
+      <input type="hidden" name="precio_vehiculo" id="precio_vehiculo" value="{{ defaults.get('precio_vehiculo','') }}" />
+      <input type="hidden" name="catalogo_id" id="catalogo_id" value="{{ defaults.get('catalogo_id','') }}" />
+
+      <div class="wizard-catalog-tabs" id="wizard-catalog-tabs">
+        <button type="button" class="wizard-catalog-tab active" data-filter="todos">Todos</button>
+        <button type="button" class="wizard-catalog-tab" data-filter="SUV">SUVs</button>
+        <button type="button" class="wizard-catalog-tab" data-filter="Sedán">Sedanes</button>
+        <button type="button" class="wizard-catalog-tab" data-filter="Deportivo">Deportivos</button>
+      </div>
+
+      <div class="wizard-catalog-search search-box" style="max-width:100%;margin:var(--space-4) 0;">
+        <span class="search-icon">🔍</span>
+        <input type="search" id="wizard-catalog-search" class="form-input" placeholder="Buscar marca o modelo…" />
+      </div>
+
+      <div class="wizard-catalog-grid" id="wizard-catalog-grid">
+        {% for v in catalogo %}
+        <button
+          type="button"
+          class="wizard-catalog-pick{% if selected_catalogo_id == v.id_catalogo %} selected{% endif %}"
+          data-id="{{ v.id_catalogo }}"
+          data-categoria="{{ v.categoria }}"
+          data-search="{{ (v.marca ~ ' ' ~ v.modelo ~ ' ' ~ v.variante)|lower }}"
+          data-vehicle='{{ {
+            "id": v.id_catalogo,
+            "marca": v.marca,
+            "modelo": v.modelo,
+            "anio": v.anio,
+            "variante": v.variante,
+            "categoria": v.categoria,
+            "combustible": v.combustible,
+            "condicion": v.condicion,
+            "descripcion": v.descripcion or "",
+            "precio": v.precio,
+            "imagen_url": v.imagen_url or ""
+          }|tojson }}'
+        >
+          <div class="wizard-catalog-pick-img-wrap">
+            {% if v.imagen_url %}
+            <img src="{{ v.imagen_url }}" alt="{{ v.marca }} {{ v.modelo }}" loading="lazy" />
+            {% else %}
+            <div class="wizard-catalog-pick-placeholder">🚗</div>
+            {% endif %}
+          </div>
+          <div class="wizard-catalog-pick-body">
+            <div class="wizard-catalog-pick-title">{{ v.marca }} {{ v.modelo }}</div>
+            <div class="wizard-catalog-pick-sub">{{ v.anio }} · {{ v.variante }}</div>
+            <div class="wizard-catalog-pick-price">S/ {{ "{:,.2f}".format(v.precio) }}</div>
+          </div>
+        </button>
+        {% endfor %}
+      </div>
+
+      <p class="form-error visible" id="wizard-catalog-error" style="display:none;margin-top:var(--space-3);">
+        Selecciona un vehículo del catálogo para continuar.
+      </p>
+
+      <div class="wizard-selected-card" id="wizard-selected-card" style="display:none;">
+        <div class="wizard-selected-image-wrap" id="wizard-selected-image-wrap"></div>
+        <div class="wizard-selected-info">
+          <div class="wizard-selected-title" id="wizard-selected-title"></div>
+          <div class="wizard-selected-meta" id="wizard-selected-meta"></div>
+          <div class="wizard-selected-price" id="wizard-selected-price"></div>
+          <button type="button" class="btn btn-ghost btn-sm" id="wizard-vehicle-info-btn">ℹ Más información</button>
         </div>
       </div>
-      <div class="form-row">
+
+      <div class="form-row" style="margin-top:var(--space-6);">
         <div class="form-group">
-          <label class="form-label">Precio del vehículo <span class="required">*</span></label>
-          <input class="form-input" name="precio_vehiculo" type="number" step="0.01" min="0.01" required value="{{ defaults.get('precio_vehiculo','') }}" />
+          <label class="form-label">Precio del vehículo (catálogo)</label>
+          <input class="form-input" id="precio_vehiculo_display" type="text" readonly tabindex="-1" placeholder="Selecciona un vehículo arriba" />
         </div>
         <div class="form-group">
           <label class="form-label">Cuota inicial (%) <span class="required">*</span> {{ help_tip('Porcentaje del precio que paga el cliente al inicio. Entre 0 y 99 %.') }}</label>
@@ -204,6 +267,23 @@
     </div>
   </form>
 </div>
+
+<div class="modal-backdrop" id="vehicle-info-modal">
+  <div class="modal modal-lg vehicle-info-modal">
+    <div class="vehicle-info-layout">
+      <div class="vehicle-info-image-wrap" id="vehicle-info-image-wrap"></div>
+      <div>
+        <h3 class="modal-title" id="vehicle-info-title">Detalle del vehículo</h3>
+        <div class="vehicle-info-tags" id="vehicle-info-tags"></div>
+        <p class="vehicle-info-desc" id="vehicle-info-desc"></p>
+        <div class="vehicle-info-price" id="vehicle-info-price"></div>
+        <div class="modal-actions" style="margin-top:var(--space-5);">
+          <button type="button" class="btn btn-secondary" onclick="closeVehicleInfoModal()">Cerrar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
 {% endblock %}
 {% block page_scripts %}
 <script src="{{ url_for('static', filename='forms.js') }}"></script>
@@ -211,5 +291,6 @@
   bindWizard();
   syncTipoTasa();
   syncModalidadCredito();
+  initWizardCatalogPicker({{ selected_catalogo_id or 'null' }});
 </script>
 {% endblock %}

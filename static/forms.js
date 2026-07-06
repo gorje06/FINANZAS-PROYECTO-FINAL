@@ -107,6 +107,9 @@
     function validateWizardStep(step) {
       var panel = panels[step];
       if (!panel) return true;
+      if (step === 1 && window.validateWizardVehicleStep) {
+        return window.validateWizardVehicleStep();
+      }
       var inputs = panel.querySelectorAll('input, select, textarea');
       var ok = true;
       var firstBad = null;
@@ -194,5 +197,148 @@
     modalidad.addEventListener('change', sync);
     if (moneda) moneda.addEventListener('change', sync);
     sync();
+  };
+
+  function formatSoles(amount) {
+    return 'S/ ' + Number(amount).toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+
+  window.openVehicleInfoModal = function (data) {
+    if (!data) return;
+    var modal = document.getElementById('vehicle-info-modal');
+    if (!modal) return;
+    var imgWrap = document.getElementById('vehicle-info-image-wrap');
+    var title = document.getElementById('vehicle-info-title');
+    var tags = document.getElementById('vehicle-info-tags');
+    var desc = document.getElementById('vehicle-info-desc');
+    var price = document.getElementById('vehicle-info-price');
+    if (title) title.textContent = data.marca + ' ' + data.modelo;
+    if (imgWrap) {
+      imgWrap.innerHTML = data.imagen_url
+        ? '<img src="' + data.imagen_url + '" alt="' + data.marca + ' ' + data.modelo + '" />'
+        : '<div class="vehicle-info-placeholder">🚗</div>';
+    }
+    if (tags) {
+      tags.innerHTML =
+        '<span class="badge badge-primary">' + data.categoria + '</span>' +
+        '<span class="badge badge-info">' + data.combustible + '</span>' +
+        '<span class="badge badge-accent">' + data.condicion + '</span>' +
+        '<span class="badge badge-primary">' + data.anio + ' · ' + data.variante + '</span>';
+    }
+    if (desc) desc.textContent = data.descripcion || '';
+    if (price) price.textContent = formatSoles(data.precio);
+    modal.classList.add('open');
+  };
+
+  window.closeVehicleInfoModal = function () {
+    var modal = document.getElementById('vehicle-info-modal');
+    if (modal) modal.classList.remove('open');
+  };
+
+  window.initWizardCatalogPicker = function (initialId) {
+    var grid = document.getElementById('wizard-catalog-grid');
+    var search = document.getElementById('wizard-catalog-search');
+    var tabs = document.querySelectorAll('.wizard-catalog-tab');
+    var err = document.getElementById('wizard-catalog-error');
+    var selectedCard = document.getElementById('wizard-selected-card');
+    var infoBtn = document.getElementById('wizard-vehicle-info-btn');
+    var activeFilter = 'todos';
+    var currentVehicle = null;
+
+    function applyFilters() {
+      if (!grid) return;
+      var q = (search && search.value ? search.value : '').toLowerCase().trim();
+      grid.querySelectorAll('.wizard-catalog-pick').forEach(function (btn) {
+        var matchCat = activeFilter === 'todos' || btn.dataset.categoria === activeFilter;
+        var matchSearch = !q || (btn.dataset.search || '').includes(q);
+        btn.style.display = matchCat && matchSearch ? '' : 'none';
+      });
+    }
+
+    function selectVehicle(data, btn) {
+      currentVehicle = data;
+      document.getElementById('marca_vehiculo').value = data.marca;
+      document.getElementById('modelo_vehiculo').value = data.modelo + ' ' + data.anio;
+      document.getElementById('precio_vehiculo').value = data.precio;
+      document.getElementById('catalogo_id').value = data.id;
+      var display = document.getElementById('precio_vehiculo_display');
+      if (display) display.value = formatSoles(data.precio);
+      if (selectedCard) {
+        selectedCard.style.display = '';
+        document.getElementById('wizard-selected-title').textContent = data.marca + ' ' + data.modelo;
+        document.getElementById('wizard-selected-meta').textContent =
+          data.anio + ' · ' + data.variante + ' · ' + data.categoria;
+        document.getElementById('wizard-selected-price').textContent = formatSoles(data.precio);
+        var imgWrap = document.getElementById('wizard-selected-image-wrap');
+        if (imgWrap) {
+          imgWrap.innerHTML = data.imagen_url
+            ? '<img src="' + data.imagen_url + '" alt="" />'
+            : '<div class="wizard-catalog-pick-placeholder">🚗</div>';
+        }
+      }
+      grid.querySelectorAll('.wizard-catalog-pick').forEach(function (b) { b.classList.remove('selected'); });
+      if (btn) btn.classList.add('selected');
+      if (err) err.style.display = 'none';
+    }
+
+    window.validateWizardVehicleStep = function () {
+      var id = document.getElementById('catalogo_id').value;
+      var precio = document.getElementById('precio_vehiculo').value;
+      if (!id || !precio || Number(precio) <= 0) {
+        if (err) err.style.display = 'block';
+        if (grid) grid.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        return false;
+      }
+      if (err) err.style.display = 'none';
+      return true;
+    };
+
+    if (grid) {
+      grid.querySelectorAll('.wizard-catalog-pick').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          selectVehicle(JSON.parse(btn.dataset.vehicle), btn);
+        });
+      });
+      if (initialId) {
+        var pre = grid.querySelector('.wizard-catalog-pick[data-id="' + initialId + '"]');
+        if (pre) selectVehicle(JSON.parse(pre.dataset.vehicle), pre);
+      } else {
+        var marcaEl = document.getElementById('marca_vehiculo');
+        var modeloEl = document.getElementById('modelo_vehiculo');
+        if (marcaEl && marcaEl.value && modeloEl && modeloEl.value) {
+          grid.querySelectorAll('.wizard-catalog-pick').forEach(function (btn) {
+            var d = JSON.parse(btn.dataset.vehicle);
+            if (d.marca === marcaEl.value.trim() && modeloEl.value.indexOf(d.modelo) !== -1) {
+              selectVehicle(d, btn);
+            }
+          });
+        }
+      }
+    }
+
+    if (search) search.addEventListener('input', applyFilters);
+    tabs.forEach(function (tab) {
+      tab.addEventListener('click', function () {
+        tabs.forEach(function (t) { t.classList.remove('active'); });
+        tab.classList.add('active');
+        activeFilter = tab.dataset.filter;
+        applyFilters();
+      });
+    });
+
+    if (infoBtn) {
+      infoBtn.addEventListener('click', function () {
+        if (currentVehicle) openVehicleInfoModal(currentVehicle);
+      });
+    }
+
+    var infoModal = document.getElementById('vehicle-info-modal');
+    if (infoModal) {
+      infoModal.addEventListener('click', function (e) {
+        if (e.target === infoModal) closeVehicleInfoModal();
+      });
+    }
+
+    applyFilters();
   };
 })();

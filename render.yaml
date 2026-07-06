@@ -1,3 +1,7 @@
+# Render — plan FREE (sin tarjeta, sin disco persistente)
+# Usar: New + -> Blueprint, O crear Web Service manual con los mismos valores.
+# La BD SQLite en Render es TEMPORAL en plan free. Para BD permanente usa run-local.bat
+
 services:
   - type: web
     name: financuota
@@ -6,12 +10,6 @@ services:
     startCommand: gunicorn --bind 0.0.0.0:$PORT app:app
     envVars:
       - key: PYTHON_VERSION
-        value: 3.12.0
+        value: "3.12.0"
       - key: SECRET_KEY
         generateValue: true
-      - key: FINANCUOTA_DB_PATH
-        value: /var/data/financuota.db
-    disk:
-      name: financuota-data
-      mountPath: /var/data
-      sizeGB: 1

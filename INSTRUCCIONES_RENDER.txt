@@ -1,0 +1,133 @@
+================================================================================
+  FINANCUOTA — Subir a Render SIN tarjeta y SIN cambiar SQLite
+================================================================================
+
+IMPORTANTE (lee esto primero)
+-----------------------------
+- El motor sigue siendo SQLite (financuota.db). No se cambia a Postgres ni Turso.
+- En tu PC la BD NO se borra: queda en la carpeta del proyecto.
+- En Render GRATIS la BD del servidor es TEMPORAL: si Render reinicia o
+  redeploya, puedes perder usuarios/simulaciones creados en la web.
+- Para la expo: usa tu PC (run-local.bat) como demo principal con datos reales.
+- Usa Render como enlace publico de respaldo.
+
+YO (el asistente) NO puedo controlar tu PC ni tu cuenta de Render.
+Tu solo copias estos pasos. Tarda unos 10 minutos.
+
+
+================================================================================
+  PARTE 1 — LOCAL (BD permanente, recomendado para presentar)
+================================================================================
+
+1. Doble clic en:  run-local.bat
+2. Abre el navegador: http://127.0.0.1:5000
+3. Admin: usuario admin  |  contrasena adminupc
+
+La base de datos queda en: financuota.db (misma carpeta del proyecto).
+
+
+================================================================================
+  PARTE 2 — RENDER sin Blueprint y sin tarjeta
+================================================================================
+
+PASO 1: Cuenta
+--------------
+1. Entra a https://dashboard.render.com
+2. Registrate con GitHub (no pide tarjeta en plan Free)
+
+
+PASO 2: Web Service (NO elijas Blueprint)
+---------------------------------------
+1. Clic en "New +"  ->  "Web Service"
+2. Conecta el repo: gorje06/FINANZAS-PROYECTO-FINAL
+3. Si no aparece, dale permiso a Render en GitHub Settings.
+
+
+PASO 3: Configuracion del servicio
+----------------------------------
+Name:              financuota   (o el que quieras)
+Region:            Oregon (US West) o el mas cercano
+Branch:            main
+Runtime:           Python 3
+Build Command:     pip install -r requirements.txt
+Start Command:     gunicorn --bind 0.0.0.0:$PORT app:app
+Instance Type:     Free   <-- importante
+
+
+PASO 4: Variables de entorno (Environment)
+----------------------------------------
+Clic en "Advanced" -> "Add Environment Variable"
+
+  SECRET_KEY  =  (clic en "Generate" o pon una clave larga aleatoria)
+
+NO agregues FINANCUOTA_DB_PATH
+NO agregues disco persistente (Disk) — eso pide tarjeta
+
+
+PASO 5: Crear
+-------------
+Clic en "Create Web Service"
+Espera 3-5 minutos hasta que diga "Live".
+
+
+PASO 6: Probar
+--------------
+URL ejemplo: https://financuota-xxxx.onrender.com
+
+- La primera vez puede tardar 30-60 seg (plan free "despierta").
+- Login admin: admin / adminupc
+- Crea usuarios y simulaciones para probar.
+
+
+================================================================================
+  PARTE 3 — Actualizar Render cuando cambies el codigo
+================================================================================
+
+En PowerShell, en la carpeta del proyecto:
+
+  cd "c:\Users\jorge\Downloads\finanzas sistema"
+  git add .
+  git commit -m "actualizacion"
+  git push origin main
+
+Render redeploya solo al detectar el push en main.
+
+
+================================================================================
+  PARTE 4 — Checklist dia de la expo
+================================================================================
+
+[ ] Probar run-local.bat en tu laptop (demo principal)
+[ ] Tener cargados Caso 1 Carlos y Caso 2 Maria en local
+[ ] Abrir Render 5 min antes por si esta "dormido"
+[ ] En Render volver a crear admin si la BD se reinicio
+[ ] Tener el repo GitHub abierto por si preguntan por el codigo
+
+
+================================================================================
+  Credenciales por defecto
+================================================================================
+
+Admin:
+  Usuario:    admin
+  Contrasena: adminupc
+
+(Cambiala en Configuracion despues de entrar si quieres.)
+
+
+================================================================================
+  Preguntas frecuentes
+================================================================================
+
+P: Por que Render borra datos?
+R: Plan free no guarda archivos en disco de forma permanente. SQLite es un
+   archivo; cuando el contenedor se reinicia, se pierde.
+
+P: Hay forma gratis de que Render guarde SQLite sin tarjeta?
+R: No en Render. La opcion gratis con SQLite persistente seria otro proveedor
+   o usar tu PC local.
+
+P: El codigo en GitHub ya esta listo?
+R: Si, repo FINANZAS-PROYECTO-FINAL rama main.
+
+================================================================================

@@ -1,0 +1,278 @@
+{% extends "layout_app.html" %}
+{% block title %}Catálogo — FinanCuota{% endblock %}
+{% block page_title %}Catálogo de Vehículos{% endblock %}
+{% block topbar_actions %}
+<button type="button" class="btn btn-accent btn-sm" id="btn-add-vehicle" onclick="openVehicleModal()">+ Agregar vehículo</button>
+{% endblock %}
+{% block content %}
+<div class="catalog-toolbar animate-in">
+  <div class="search-box catalog-search">
+    <span class="search-icon">🔍</span>
+    <input type="search" id="catalog-search" class="form-input" placeholder="Buscar por marca o modelo…" />
+  </div>
+  <div class="catalog-filters" id="catalog-filters">
+    <button type="button" class="catalog-filter active" data-filter="todos">Todos</button>
+    {% for cat in categorias %}
+    <button type="button" class="catalog-filter" data-filter="{{ cat }}">
+      {%- if cat == 'SUV' -%}SUVs{%- elif cat == 'Sedán' -%}Sedanes{%- elif cat == 'Deportivo' -%}Deportivos{%- else -%}{{ cat }}{%- endif -%}
+    </button>
+    {% endfor %}
+  </div>
+</div>
+
+{% if vehiculos %}
+<div class="catalog-grid animate-in" id="catalog-grid">
+  {% for v in vehiculos %}
+  <article
+    class="catalog-card"
+    data-categoria="{{ v.categoria }}"
+    data-search="{{ (v.marca ~ ' ' ~ v.modelo ~ ' ' ~ v.variante)|lower }}"
+    data-vehicle='{{ {
+      "id": v.id_catalogo,
+      "marca": v.marca,
+      "modelo": v.modelo,
+      "anio": v.anio,
+      "variante": v.variante,
+      "categoria": v.categoria,
+      "combustible": v.combustible,
+      "condicion": v.condicion,
+      "descripcion": v.descripcion or "",
+      "precio": v.precio,
+      "imagen_url": v.imagen_url or ""
+    }|tojson }}'
+  >
+    <div class="catalog-card-image-wrap">
+      {% if v.imagen_url %}
+      <img class="catalog-card-image" src="{{ v.imagen_url }}" alt="{{ v.marca }} {{ v.modelo }}" loading="lazy" />
+      {% else %}
+      <div class="catalog-card-image catalog-card-placeholder">🚗</div>
+      {% endif %}
+    </div>
+    <div class="catalog-card-body">
+      <h3 class="catalog-card-title">{{ v.marca }} {{ v.modelo }}</h3>
+      <p class="catalog-card-subtitle">{{ v.anio }} · {{ v.variante }}</p>
+      <div class="catalog-card-tags">
+        <span class="badge badge-primary">{{ v.categoria }}</span>
+        <span class="badge badge-info">{{ v.combustible }}</span>
+        <span class="badge badge-accent">{{ v.condicion }}</span>
+      </div>
+      <p class="catalog-card-desc">{{ v.descripcion }}</p>
+      <div class="catalog-card-footer">
+        <span class="catalog-card-price">S/ {{ "{:,.2f}".format(v.precio) }}</span>
+        <div class="catalog-card-actions">
+          <button type="button" class="btn btn-ghost btn-sm" onclick="openVehicleInfoModal(JSON.parse(this.closest('.catalog-card').dataset.vehicle))">ℹ Más info</button>
+          <a href="{{ url_for('wizard', catalogo=v.id_catalogo) }}" class="btn btn-accent btn-sm">Simular</a>
+          <button type="button" class="btn btn-ghost btn-sm" onclick="openVehicleModal(JSON.parse(this.closest('.catalog-card').dataset.vehicle))">Editar</button>
+          <button type="button" class="btn btn-ghost btn-sm catalog-btn-delete" onclick="confirmDeleteVehicle({{ v.id_catalogo }}, '{{ v.marca }} {{ v.modelo }}')">Eliminar</button>
+        </div>
+      </div>
+    </div>
+  </article>
+  {% endfor %}
+</div>
+<div class="catalog-empty-filter" id="catalog-empty-filter" hidden>
+  <div class="empty-state-icon">🔍</div>
+  <div class="empty-state-title">Sin resultados</div>
+  <div class="empty-state-text">Prueba otra búsqueda o cambia el filtro de categoría.</div>
+</div>
+{% else %}
+<div class="empty-state animate-in">
+  <div class="empty-state-icon">🚗</div>
+  <div class="empty-state-title">Catálogo vacío</div>
+  <div class="empty-state-text">Agrega vehículos con el botón superior para empezar.</div>
+  <button type="button" class="btn btn-accent btn-lg" onclick="openVehicleModal()">+ Agregar vehículo</button>
+</div>
+{% endif %}
+
+<div class="modal-backdrop" id="vehicle-modal">
+  <div class="modal modal-lg">
+    <h3 class="modal-title" id="vehicle-modal-title">Agregar vehículo</h3>
+    <form method="post" id="vehicle-form">
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Marca <span class="required">*</span></label>
+          <input class="form-input" name="marca" required />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Modelo <span class="required">*</span></label>
+          <input class="form-input" name="modelo" required />
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Año <span class="required">*</span></label>
+          <input class="form-input" name="anio" type="number" min="1990" max="2035" required />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Variante <span class="required">*</span></label>
+          <input class="form-input" name="variante" required placeholder="Ej. GT Premium 5.0 V8" />
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Categoría</label>
+          <select class="form-input" name="categoria">
+            {% for cat in categorias %}
+            <option value="{{ cat }}">{{ cat }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Combustible</label>
+          <select class="form-input" name="combustible">
+            {% for c in combustibles %}
+            <option value="{{ c }}">{{ c }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Condición</label>
+          <select class="form-input" name="condicion">
+            {% for c in condiciones %}
+            <option value="{{ c }}">{{ c }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Precio (S/) <span class="required">*</span></label>
+          <input class="form-input" name="precio" type="number" step="0.01" min="0.01" required />
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">URL de imagen</label>
+        <input class="form-input" name="imagen_url" type="url" placeholder="https://..." />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Descripción</label>
+        <textarea class="form-input" name="descripcion" rows="3" placeholder="Breve descripción del vehículo…"></textarea>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-secondary" onclick="closeVehicleModal()">Cancelar</button>
+        <button type="submit" class="btn btn-accent" id="vehicle-form-submit">Guardar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="delete-vehicle-modal">
+  <div class="modal">
+    <h3 class="modal-title">¿Eliminar vehículo?</h3>
+    <p class="modal-text" id="delete-vehicle-text">Esta acción no se puede deshacer.</p>
+    <form method="post" id="delete-vehicle-form" action="">
+      <div class="modal-actions">
+        <button type="button" class="btn btn-secondary" onclick="closeDeleteVehicleModal()">Cancelar</button>
+        <button type="submit" class="btn btn-danger">Eliminar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="vehicle-info-modal">
+  <div class="modal modal-lg vehicle-info-modal">
+    <div class="vehicle-info-layout">
+      <div class="vehicle-info-image-wrap" id="vehicle-info-image-wrap"></div>
+      <div>
+        <h3 class="modal-title" id="vehicle-info-title">Detalle del vehículo</h3>
+        <div class="vehicle-info-tags" id="vehicle-info-tags"></div>
+        <p class="vehicle-info-desc" id="vehicle-info-desc"></p>
+        <div class="vehicle-info-price" id="vehicle-info-price"></div>
+        <div class="modal-actions" style="margin-top:var(--space-5);">
+          <button type="button" class="btn btn-secondary" onclick="closeVehicleInfoModal()">Cerrar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block page_scripts %}
+<script src="{{ url_for('static', filename='forms.js') }}"></script>
+<script>
+  var activeFilter = 'todos';
+  var searchInput = document.getElementById('catalog-search');
+  var grid = document.getElementById('catalog-grid');
+  var emptyFilter = document.getElementById('catalog-empty-filter');
+
+  function applyCatalogFilters() {
+    if (!grid) return;
+    var q = (searchInput ? searchInput.value : '').toLowerCase().trim();
+    var visible = 0;
+    grid.querySelectorAll('.catalog-card').forEach(function (card) {
+      var matchCat = activeFilter === 'todos' || card.dataset.categoria === activeFilter;
+      var matchSearch = !q || (card.dataset.search || '').includes(q);
+      var show = matchCat && matchSearch;
+      card.style.display = show ? '' : 'none';
+      if (show) visible++;
+    });
+    if (emptyFilter) emptyFilter.hidden = visible > 0;
+  }
+
+  if (searchInput) searchInput.addEventListener('input', applyCatalogFilters);
+
+  document.querySelectorAll('.catalog-filter').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      document.querySelectorAll('.catalog-filter').forEach(function (b) { b.classList.remove('active'); });
+      btn.classList.add('active');
+      activeFilter = btn.dataset.filter;
+      applyCatalogFilters();
+    });
+  });
+
+  function openVehicleModal(data) {
+    var modal = document.getElementById('vehicle-modal');
+    var form = document.getElementById('vehicle-form');
+    var title = document.getElementById('vehicle-modal-title');
+    form.reset();
+    if (data && data.id) {
+      title.textContent = 'Editar vehículo';
+      form.action = '/catalogo/' + data.id + '/editar';
+      form.marca.value = data.marca;
+      form.modelo.value = data.modelo;
+      form.anio.value = data.anio;
+      form.variante.value = data.variante;
+      form.categoria.value = data.categoria;
+      form.combustible.value = data.combustible;
+      form.condicion.value = data.condicion;
+      form.precio.value = data.precio;
+      form.imagen_url.value = data.imagen_url || '';
+      form.descripcion.value = data.descripcion || '';
+    } else {
+      title.textContent = 'Agregar vehículo';
+      form.action = '/catalogo';
+    }
+    modal.classList.add('open');
+  }
+
+  function closeVehicleModal() {
+    document.getElementById('vehicle-modal').classList.remove('open');
+  }
+
+  function confirmDeleteVehicle(id, name) {
+    document.getElementById('delete-vehicle-text').textContent =
+      'Se eliminará "' + name + '" del catálogo. Esta acción no se puede deshacer.';
+    document.getElementById('delete-vehicle-form').action = '/catalogo/' + id + '/eliminar';
+    document.getElementById('delete-vehicle-modal').classList.add('open');
+  }
+
+  function closeDeleteVehicleModal() {
+    document.getElementById('delete-vehicle-modal').classList.remove('open');
+  }
+
+  ['vehicle-modal', 'delete-vehicle-modal'].forEach(function (id) {
+    var el = document.getElementById(id);
+    if (el) el.addEventListener('click', function (e) {
+      if (e.target === el) {
+        el.classList.remove('open');
+      }
+    });
+  });
+
+  var infoModal = document.getElementById('vehicle-info-modal');
+  if (infoModal) {
+    infoModal.addEventListener('click', function (e) {
+      if (e.target === infoModal) closeVehicleInfoModal();
+    });
+  }
+</script>
+{% endblock %}

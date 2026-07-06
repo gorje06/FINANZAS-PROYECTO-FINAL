@@ -18,17 +18,20 @@
         <nav class="sidebar-nav">
           <span class="sidebar-section-label">Menú</span>
           <a href="{{ url_for('dashboard') }}" class="sidebar-link {% if active_nav == 'dashboard' %}active{% endif %}" id="nav-dashboard">
-            <span class="icon"></span> Dashboard
+            <span class="icon">▦</span> Dashboard
+          </a>
+          <a href="{{ url_for('catalogo') }}" class="sidebar-link {% if active_nav == 'catalogo' %}active{% endif %}" id="nav-catalogo">
+            <span class="icon">🚗</span> Catálogo
           </a>
           <a href="{{ url_for('wizard') }}" class="sidebar-link {% if active_nav == 'wizard' %}active{% endif %}" id="nav-wizard">
-            <span class="icon"></span> Nueva Simulación
+            <span class="icon">＋</span> Nueva Simulación
           </a>
           <a href="{{ url_for('settings') }}" class="sidebar-link {% if active_nav == 'settings' %}active{% endif %}" id="nav-settings">
-            <span class="icon"></span> Configuración
+            <span class="icon">⚙</span> Configuración
           </a>
           {% if is_admin %}
           <a href="{{ url_for('admin_panel') }}" class="sidebar-link {% if active_nav == 'admin' %}active{% endif %}" id="nav-admin">
-            <span class="icon"></span> Administración
+            <span class="icon">★</span> Administración
           </a>
           {% endif %}
         </nav>
