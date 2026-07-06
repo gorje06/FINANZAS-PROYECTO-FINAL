@@ -3,7 +3,8 @@
 {% block page_title %}Detalle del Crédito{% endblock %}
 {% block topbar_actions %}
 <a href="{{ url_for('dashboard') }}" class="btn btn-ghost btn-sm">← Dashboard</a>
-<a href="{{ url_for('plan_csv', credito_id=plan.id_credito) }}" class="btn btn-secondary btn-sm" id="btn-export-csv">Exportar CSV</a>
+<a href="{{ url_for('plan_edit', credito_id=plan.id_credito) }}" class="btn btn-secondary btn-sm">Editar</a>
+<a href="{{ url_for('plan_csv', credito_id=plan.id_credito) }}" class="btn btn-secondary btn-sm" id="btn-export-csv">Exportar Excel</a>
 {% endblock %}
 {% block content %}
 {% set sym = 'S/' if plan.moneda == 'Soles' else '$' %}

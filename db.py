@@ -65,6 +65,21 @@ def _safe_add_column(conn, table: str, column: str, sql: str) -> None:
             raise
 
 
+def _sql_int(value, default: int = 0) -> int:
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        return int(value)
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float):
+        return int(value)
+    try:
+        return int(str(value).strip())
+    except (TypeError, ValueError):
+        return default
+
+
 def init_db() -> None:
     conn = get_conn()
     cur = conn.cursor()
@@ -246,10 +261,74 @@ def init_db() -> None:
         )
         conn.commit()
 
-    _seed_catalogo(conn)
-    _sync_catalogo_data(conn)
+    _ensure_catalogo(conn)
 
     conn.close()
+
+
+def _ensure_catalogo(conn) -> None:
+    """Inserta o actualiza los vehículos base del catálogo (idempotente, compatible Turso)."""
+    for item in CATALOGO_VEHICULOS:
+        marca, modelo, anio, variante, categoria, combustible, condicion, descripcion, precio, imagen_url = (
+            _catalogo_row_tuple(item)
+        )
+        row = conn.execute(
+            "SELECT id_catalogo FROM catalogo_vehiculo WHERE marca = ? AND modelo = ? LIMIT 1",
+            (marca, modelo),
+        ).fetchone()
+        if row:
+            conn.execute(
+                """
+                UPDATE catalogo_vehiculo SET
+                    anio=?, variante=?, categoria=?, combustible=?, condicion=?,
+                    descripcion=?, precio=?, imagen_url=?
+                WHERE id_catalogo=?
+                """,
+                (
+                    anio,
+                    variante,
+                    categoria,
+                    combustible,
+                    condicion,
+                    descripcion,
+                    precio,
+                    imagen_url,
+                    row["id_catalogo"],
+                ),
+            )
+        else:
+            conn.execute(
+                """
+                INSERT INTO catalogo_vehiculo (
+                    marca, modelo, anio, variante, categoria, combustible, condicion,
+                    descripcion, precio, imagen_url
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    marca,
+                    modelo,
+                    anio,
+                    variante,
+                    categoria,
+                    combustible,
+                    condicion,
+                    descripcion,
+                    precio,
+                    imagen_url,
+                ),
+            )
+    conn.commit()
+
+
+def catalogo_count(conn=None) -> int:
+    own = conn is None
+    if own:
+        conn = get_conn()
+    row = conn.execute("SELECT COUNT(*) AS n FROM catalogo_vehiculo").fetchone()
+    count = _sql_int(row["n"] if row else 0)
+    if own:
+        conn.close()
+    return count
 
 
 CATALOGO_VEHICULOS = [
@@ -462,48 +541,3 @@ def _catalogo_row_tuple(item: dict) -> tuple:
         item["precio"],
         f"/static/catalog/{item['imagen']}",
     )
-
-
-def _seed_catalogo(conn) -> None:
-    count = conn.execute("SELECT COUNT(*) AS n FROM catalogo_vehiculo").fetchone()["n"]
-    if count:
-        return
-    conn.executemany(
-        """
-        INSERT INTO catalogo_vehiculo (
-            marca, modelo, anio, variante, categoria, combustible, condicion,
-            descripcion, precio, imagen_url
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """,
-        [_catalogo_row_tuple(v) for v in CATALOGO_VEHICULOS],
-    )
-    conn.commit()
-
-
-def _sync_catalogo_data(conn) -> None:
-    """Actualiza precios, fotos y descripciones del catálogo base."""
-    for item in CATALOGO_VEHICULOS:
-        marca, modelo, anio, variante, categoria, combustible, condicion, descripcion, precio, imagen_url = (
-            _catalogo_row_tuple(item)
-        )
-        conn.execute(
-            """
-            UPDATE catalogo_vehiculo SET
-                anio=?, variante=?, categoria=?, combustible=?, condicion=?,
-                descripcion=?, precio=?, imagen_url=?
-            WHERE marca=? AND modelo=?
-            """,
-            (
-                anio,
-                variante,
-                categoria,
-                combustible,
-                condicion,
-                descripcion,
-                precio,
-                imagen_url,
-                marca,
-                modelo,
-            ),
-        )
-    conn.commit()

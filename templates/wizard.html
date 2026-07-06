@@ -1,11 +1,12 @@
 {% extends "layout_app.html" %}
 {% from "macros.html" import help_tip %}
-{% block title %}Nueva Simulación — FinanCuota{% endblock %}
-{% block page_title %}Nueva Simulación{% endblock %}
+{% block title %}{% if edit_credito_id %}Editar Simulación #{{ edit_credito_id }}{% else %}Nueva Simulación{% endif %} — FinanCuota{% endblock %}
+{% block page_title %}{% if edit_credito_id %}Editar Simulación #{{ edit_credito_id }}{% else %}Nueva Simulación{% endif %}{% endblock %}
 {% block topbar_actions %}
-<a href="{{ url_for('dashboard') }}" class="btn btn-ghost btn-sm">← Dashboard</a>
+<a href="{{ url_for('plan_detail', credito_id=edit_credito_id) if edit_credito_id else url_for('dashboard') }}" class="btn btn-ghost btn-sm">← {% if edit_credito_id %}Detalle{% else %}Dashboard{% endif %}</a>
 {% endblock %}
 {% block content %}
+{% if not edit_credito_id %}
 <div class="card animate-in" style="padding:var(--space-4) var(--space-6);margin-bottom:var(--space-4);">
   <p style="margin:0 0 var(--space-3);font-size:var(--text-sm);color:var(--color-neutral-600);">Casos de prueba del informe (cap. 3.4):</p>
   <div style="display:flex;flex-wrap:wrap;gap:var(--space-3);">
@@ -13,6 +14,13 @@
     <a href="{{ url_for('wizard', caso='maria') }}" class="btn btn-ghost btn-sm">Caso 2 — María López (Compra Inteligente)</a>
   </div>
 </div>
+{% else %}
+<div class="card animate-in" style="padding:var(--space-4) var(--space-6);margin-bottom:var(--space-4);background:var(--color-primary-50);">
+  <p style="margin:0;font-size:var(--text-sm);color:var(--color-primary-800);">
+    Estás editando una simulación guardada. Corrige los datos y vuelve a generar el cronograma.
+  </p>
+</div>
+{% endif %}
 <div class="card animate-in" style="padding:var(--space-6);">
   <div class="wizard-stepper">
     <div class="wizard-step active"><div class="wizard-step-circle">1</div><div class="wizard-step-label">Cliente</div></div>
@@ -24,7 +32,7 @@
     <div class="wizard-step"><div class="wizard-step-circle">4</div><div class="wizard-step-label">Costos</div></div>
   </div>
 
-  <form method="post" id="wizard-form" novalidate>
+  <form method="post" id="wizard-form" novalidate{% if edit_credito_id %} action="{{ url_for('plan_edit', credito_id=edit_credito_id) }}"{% endif %}>
     <div class="wizard-panel active" data-step="0">
       <h3 style="margin-bottom:var(--space-5);color:var(--color-primary-900);">Datos del cliente</h3>
       <div class="form-row">
@@ -262,7 +270,7 @@
       <button type="button" class="btn btn-secondary" id="wizard-prev">Anterior</button>
       <div style="display:flex;gap:var(--space-3);">
         <button type="button" class="btn btn-accent" id="wizard-next">Siguiente</button>
-        <button type="submit" class="btn btn-accent" id="wizard-submit" style="display:none;">Generar simulación</button>
+        <button type="submit" class="btn btn-accent" id="wizard-submit" style="display:none;">{% if edit_credito_id %}Guardar cambios{% else %}Generar simulación{% endif %}</button>
       </div>
     </div>
   </form>

@@ -28,6 +28,7 @@
       <thead>
         <tr>
           <th>#</th>
+          {% if is_admin_view %}<th>Vendedor</th>{% endif %}
           <th>Cliente</th>
           <th>Vehículo</th>
           <th>Moneda</th>
@@ -40,6 +41,7 @@
         {% for plan in plans %}
         <tr class="plan-row">
           <td>{{ plan.id }}</td>
+          {% if is_admin_view %}<td>{{ plan.usuario_login or '—' }}</td>{% endif %}
           <td>{{ plan.nombre_cliente }} {{ plan.apellido_cliente }}</td>
           <td>{{ plan.marca_vehiculo }} {{ plan.modelo_vehiculo }}</td>
           <td><span class="badge badge-primary">{{ plan.moneda }}</span></td>
@@ -47,6 +49,7 @@
           <td>{{ plan.fecha_desembolso or plan.created_at }}</td>
           <td style="text-align:right;white-space:nowrap;">
             <a href="{{ url_for('plan_detail', credito_id=plan.id) }}" class="btn btn-secondary btn-sm">Ver</a>
+            <a href="{{ url_for('plan_edit', credito_id=plan.id) }}" class="btn btn-ghost btn-sm">Editar</a>
             <button type="button" class="btn btn-danger btn-sm" onclick="confirmDelete({{ plan.id }}, '{{ plan.nombre_cliente }} {{ plan.apellido_cliente }}')">Eliminar</button>
           </td>
         </tr>

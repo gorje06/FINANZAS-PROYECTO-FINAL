@@ -11,7 +11,7 @@ from functools import wraps
 from flask import Flask, Response, flash, redirect, render_template, request, session, url_for
 from werkzeug.security import check_password_hash, generate_password_hash
 
-from db import DB_PATH, get_conn, init_db
+from db import DB_PATH, catalogo_count, get_conn, init_db
 from finance import MODALIDAD_COMPRA_INTELIGENTE, MODALIDAD_CONVENCIONAL, build_schedule
 
 
@@ -490,21 +490,37 @@ def logout():
     return redirect(url_for("login"))
 
 
-def _list_creditos(id_usuario):
+def _list_creditos(id_usuario=None, all_users: bool = False):
     conn = get_conn()
-    rows = conn.execute(
-        """
-        SELECT c.id_credito AS id, cl.nombre_cliente, cl.apellido_cliente,
-               v.marca_vehiculo, v.modelo_vehiculo, c.moneda, c.fecha_desembolso, c.created_at,
-               COALESCE(c.modalidad, 'Convencional') AS modalidad
-        FROM credito c
-        JOIN cliente cl ON c.id_cliente = cl.id_cliente
-        JOIN vehiculo v ON c.id_vehiculo = v.id_vehiculo
-        WHERE cl.id_usuario = ?
-        ORDER BY c.id_credito DESC
-        """,
-        (id_usuario,),
-    ).fetchall()
+    if all_users:
+        rows = conn.execute(
+            """
+            SELECT c.id_credito AS id, cl.nombre_cliente, cl.apellido_cliente,
+                   v.marca_vehiculo, v.modelo_vehiculo, c.moneda, c.fecha_desembolso, c.created_at,
+                   COALESCE(c.modalidad, 'Convencional') AS modalidad,
+                   u.usuario_login
+            FROM credito c
+            JOIN cliente cl ON c.id_cliente = cl.id_cliente
+            JOIN usuario u ON cl.id_usuario = u.id_usuario
+            JOIN vehiculo v ON c.id_vehiculo = v.id_vehiculo
+            ORDER BY c.id_credito DESC
+            """
+        ).fetchall()
+    else:
+        rows = conn.execute(
+            """
+            SELECT c.id_credito AS id, cl.nombre_cliente, cl.apellido_cliente,
+                   v.marca_vehiculo, v.modelo_vehiculo, c.moneda, c.fecha_desembolso, c.created_at,
+                   COALESCE(c.modalidad, 'Convencional') AS modalidad,
+                   NULL AS usuario_login
+            FROM credito c
+            JOIN cliente cl ON c.id_cliente = cl.id_cliente
+            JOIN vehiculo v ON c.id_vehiculo = v.id_vehiculo
+            WHERE cl.id_usuario = ?
+            ORDER BY c.id_credito DESC
+            """,
+            (id_usuario,),
+        ).fetchall()
     conn.close()
     return rows
 
@@ -694,6 +710,234 @@ def _create_credito(uid: int, data: dict) -> int:
     return id_credito
 
 
+def _persist_credito_result(
+    conn,
+    *,
+    id_cliente: int,
+    id_vehiculo: int,
+    id_credito: int,
+    data: dict,
+    result,
+) -> None:
+    conn.execute(
+        """
+        UPDATE cliente SET nombre_cliente=?, apellido_cliente=?, correo_cliente=?, telefono_cliente=?,
+            direccion_cliente=?, ingresos_mensuales=? WHERE id_cliente=?
+        """,
+        (
+            data["nombres_cliente"],
+            data["apellidos_cliente"],
+            data["correo_cliente"],
+            data["telefono_cliente"],
+            data["direccion_cliente"],
+            data["ingresos_mensuales"],
+            id_cliente,
+        ),
+    )
+    conn.execute(
+        "UPDATE vehiculo SET marca_vehiculo=?, modelo_vehiculo=?, precio_vehiculo=? WHERE id_vehiculo=?",
+        (data["marca_vehiculo"], data["modelo_vehiculo"], data["precio_vehiculo"], id_vehiculo),
+    )
+    conn.execute(
+        """
+        UPDATE credito SET
+            moneda=?, tipo_tasa=?, tasa_interes=?, capitalizacion=?, periodo_tasa=?, plazo_meses=?,
+            periodo_gracia=?, meses_gracia=?, cuota_inicial=?, fecha_desembolso=?, tem=?, cuota_base=?,
+            total_financiado=?, flujo_json=?, modalidad=?, cuota_balon_pct=?, cuota_balon_monto=?,
+            gastos_notariales=?, gastos_registrales=?, costos_iniciales=?, tipo_cambio=?
+        WHERE id_credito=?
+        """,
+        (
+            data["moneda"],
+            data["tipo_tasa"],
+            data["tasa_interes"],
+            data["capitalizacion"],
+            data["periodo_tasa"],
+            data["plazo_meses"],
+            data["periodo_gracia"],
+            data["meses_gracia"],
+            data["cuota_inicial_pct"],
+            data["fecha_desembolso"],
+            result.tem,
+            result.cuota_base,
+            result.saldo_inicial,
+            json.dumps(result.flujo),
+            result.modalidad,
+            data["cuota_balon_pct"],
+            result.cuota_balon_monto,
+            data["gastos_notariales"],
+            data["gastos_registrales"],
+            data["costos_iniciales"],
+            data["tipo_cambio"],
+            id_credito,
+        ),
+    )
+    conn.execute("DELETE FROM cronograma_pago WHERE id_credito = ?", (id_credito,))
+    conn.execute("DELETE FROM indicadores_financieros WHERE id_credito = ?", (id_credito,))
+    conn.execute("DELETE FROM seguro WHERE id_credito = ?", (id_credito,))
+    conn.execute(
+        "INSERT INTO seguro (id_credito, seguro_desgravamen, seguro_vehicular, portes) VALUES (?, ?, ?, ?)",
+        (id_credito, data["seguro_desgravamen"], data["seguro_vehicular"], data["portes"]),
+    )
+    conn.execute(
+        "INSERT INTO indicadores_financieros (id_credito, van, tir, tcea, tem) VALUES (?, ?, ?, ?, ?)",
+        (id_credito, result.van, result.tir, result.tcea, result.tem),
+    )
+    for row in result.schedule:
+        conn.execute(
+            """
+            INSERT INTO cronograma_pago (
+                id_credito, numero_cuota, cuota_base, interes_periodo, amortizacion_periodo,
+                saldo_pendiente, cuota_total, seguro_cuota, portes_cuota, cuota_balon
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                id_credito,
+                row.periodo,
+                result.cuota_base,
+                row.interes,
+                row.amortizacion,
+                row.saldo_final,
+                row.cuota_total,
+                row.seguro,
+                row.portes,
+                row.cuota_balon,
+            ),
+        )
+
+
+def _update_credito(credito_id: int, data: dict) -> int:
+    result = build_schedule(
+        precio_vehiculo=data["precio_vehiculo"],
+        cuota_inicial_pct=data["cuota_inicial_pct"],
+        tipo_tasa=data["tipo_tasa"],
+        tasa_interes=data["tasa_interes"],
+        plazo_meses=data["plazo_meses"],
+        periodo_gracia=data["periodo_gracia"],
+        meses_gracia=data["meses_gracia"],
+        seguro_desgravamen=data["seguro_desgravamen"],
+        seguro_vehicular=data["seguro_vehicular"],
+        portes=data["portes"],
+        capitalizacion=data["capitalizacion"],
+        periodo_tasa=data["periodo_tasa"],
+        modalidad=data["modalidad"],
+        cuota_balon_pct=data["cuota_balon_pct"],
+        gastos_notariales=data["gastos_notariales"],
+        gastos_registrales=data["gastos_registrales"],
+        costos_iniciales=data["costos_iniciales"],
+    )
+    conn = get_conn()
+    extra, params = _credito_access_clause()
+    row = conn.execute(
+        f"""
+        SELECT c.id_credito, c.id_cliente, c.id_vehiculo
+        FROM credito c
+        JOIN cliente cl ON c.id_cliente = cl.id_cliente
+        WHERE c.id_credito = ?{extra}
+        """,
+        [credito_id, *params],
+    ).fetchone()
+    if not row:
+        conn.close()
+        raise ValueError("Simulación no encontrada o sin permiso para editarla.")
+    _persist_credito_result(
+        conn,
+        id_cliente=row["id_cliente"],
+        id_vehiculo=row["id_vehiculo"],
+        id_credito=credito_id,
+        data=data,
+        result=result,
+    )
+    conn.commit()
+    conn.close()
+    _save_defaults_from_form(data)
+    return credito_id
+
+
+def _load_credito_defaults(credito_id: int) -> dict | None:
+    extra, params = _credito_access_clause()
+    conn = get_conn()
+    row = conn.execute(
+        f"""
+        SELECT c.*, cl.nombre_cliente, cl.apellido_cliente, cl.correo_cliente, cl.telefono_cliente,
+               cl.direccion_cliente, cl.ingresos_mensuales,
+               v.marca_vehiculo, v.modelo_vehiculo, v.precio_vehiculo,
+               s.seguro_desgravamen, s.seguro_vehicular, s.portes
+        FROM credito c
+        JOIN cliente cl ON c.id_cliente = cl.id_cliente
+        JOIN vehiculo v ON c.id_vehiculo = v.id_vehiculo
+        LEFT JOIN seguro s ON c.id_credito = s.id_credito
+        WHERE c.id_credito = ?{extra}
+        """,
+        [credito_id, *params],
+    ).fetchone()
+    conn.close()
+    if not row:
+        return None
+    catalogo_id = _match_catalogo_id(row["marca_vehiculo"], row["modelo_vehiculo"], row["precio_vehiculo"])
+    return {
+        "nombres_cliente": row["nombre_cliente"],
+        "apellidos_cliente": row["apellido_cliente"],
+        "correo_cliente": row["correo_cliente"] or "",
+        "telefono_cliente": row["telefono_cliente"] or "",
+        "direccion_cliente": row["direccion_cliente"] or "",
+        "ingresos_mensuales": str(row["ingresos_mensuales"]),
+        "marca_vehiculo": row["marca_vehiculo"],
+        "modelo_vehiculo": row["modelo_vehiculo"],
+        "precio_vehiculo": str(row["precio_vehiculo"]),
+        "catalogo_id": str(catalogo_id) if catalogo_id else "",
+        "cuota_inicial_pct": str(row["cuota_inicial"]),
+        "moneda": row["moneda"],
+        "modalidad": row["modalidad"] or MODALIDAD_CONVENCIONAL,
+        "tipo_cambio": str(row["tipo_cambio"]) if row["tipo_cambio"] else "",
+        "cuota_balon_pct": str(row["cuota_balon_pct"] or 0),
+        "tipo_tasa": row["tipo_tasa"],
+        "periodo_tasa": str(row["periodo_tasa"] if row["periodo_tasa"] is not None else 7),
+        "tasa_interes": str(round(float(row["tasa_interes"]) * 100, 6)),
+        "capitalizacion": str(row["capitalizacion"]) if row["capitalizacion"] is not None else "",
+        "plazo_meses": str(row["plazo_meses"]),
+        "fecha_desembolso": row["fecha_desembolso"] or "",
+        "periodo_gracia": row["periodo_gracia"] or "Ninguno",
+        "meses_gracia": str(row["meses_gracia"] or 0),
+        "seguro_desgravamen": str(round(float(row["seguro_desgravamen"] or 0) * 100, 6)),
+        "seguro_vehicular": str(round(float(row["seguro_vehicular"] or 0) * 100, 6)),
+        "portes": str(row["portes"] or 0),
+        "gastos_notariales": str(row["gastos_notariales"] or 0),
+        "gastos_registrales": str(row["gastos_registrales"] or 0),
+        "costos_iniciales": str(row["costos_iniciales"] or 0),
+    }
+
+
+def _render_wizard_page(defaults, *, edit_credito_id=None, selected_catalogo_id=None, flash_caso=None):
+    if flash_caso and flash_caso in CASOS_PRUEBA:
+        defaults.update(CASOS_PRUEBA[flash_caso])
+        flash(f"Caso de prueba cargado: {flash_caso.title()}.")
+    if selected_catalogo_id is None and defaults.get("catalogo_id"):
+        try:
+            selected_catalogo_id = int(defaults["catalogo_id"])
+        except (TypeError, ValueError):
+            selected_catalogo_id = None
+    if selected_catalogo_id is None and defaults.get("marca_vehiculo") and defaults.get("modelo_vehiculo"):
+        selected_catalogo_id = _match_catalogo_id(
+            defaults.get("marca_vehiculo", ""),
+            defaults.get("modelo_vehiculo", ""),
+            defaults.get("precio_vehiculo"),
+        )
+        if selected_catalogo_id:
+            defaults["catalogo_id"] = str(selected_catalogo_id)
+    return render_template(
+        "wizard.html",
+        defaults=defaults,
+        catalogo=_list_catalogo(),
+        selected_catalogo_id=selected_catalogo_id,
+        periodo_opciones=PERIODO_OPCIONES,
+        active_nav="wizard",
+        modalidades=(MODALIDAD_CONVENCIONAL, MODALIDAD_COMPRA_INTELIGENTE),
+        casos_prueba=CASOS_PRUEBA,
+        edit_credito_id=edit_credito_id,
+    )
+
+
 CATEGORIAS_CATALOGO = ("SUV", "Sedán", "Deportivo")
 COMBUSTIBLES_CATALOGO = ("Gasolina", "Híbrido", "Eléctrico", "Diésel")
 CONDICIONES_CATALOGO = ("Nuevo", "Seminuevo")
@@ -709,6 +953,18 @@ def _list_catalogo():
         ORDER BY categoria ASC, marca ASC, modelo ASC
         """
     ).fetchall()
+    if not rows:
+        from db import _ensure_catalogo
+
+        _ensure_catalogo(conn)
+        rows = conn.execute(
+            """
+            SELECT id_catalogo, marca, modelo, anio, variante, categoria, combustible,
+                   condicion, descripcion, precio, imagen_url
+            FROM catalogo_vehiculo
+            ORDER BY categoria ASC, marca ASC, modelo ASC
+            """
+        ).fetchall()
     conn.close()
     return rows
 
@@ -899,7 +1155,8 @@ def catalogo_delete(catalogo_id: int):
 def dashboard():
     return render_template(
         "dashboard.html",
-        plans=_list_creditos(session["user_id"]),
+        plans=_list_creditos(all_users=_is_admin()) if _is_admin() else _list_creditos(session["user_id"]),
+        is_admin_view=_is_admin(),
         active_nav="dashboard",
     )
 
@@ -916,9 +1173,6 @@ def wizard():
             flash(f"Error en cálculo o registro: {exc}")
     defaults = _get_defaults()
     caso = request.args.get("caso", "").strip().lower()
-    if caso in CASOS_PRUEBA:
-        defaults.update(CASOS_PRUEBA[caso])
-        flash(f"Caso de prueba cargado: {caso.title()}.")
     catalogo_id = request.args.get("catalogo", type=int)
     selected_catalogo_id = catalogo_id
     if catalogo_id:
@@ -935,25 +1189,29 @@ def wizard():
             flash(f"Vehículo cargado: {item['marca']} {item['modelo']}.")
         else:
             flash("Vehículo del catálogo no encontrado.")
-    elif defaults.get("marca_vehiculo") and defaults.get("modelo_vehiculo"):
-        selected_catalogo_id = _match_catalogo_id(
-            defaults.get("marca_vehiculo", ""),
-            defaults.get("modelo_vehiculo", ""),
-            defaults.get("precio_vehiculo"),
-        )
-        if selected_catalogo_id:
-            defaults["catalogo_id"] = str(selected_catalogo_id)
-    catalogo_list = _list_catalogo()
-    return render_template(
-        "wizard.html",
-        defaults=defaults,
-        catalogo=catalogo_list,
-        selected_catalogo_id=selected_catalogo_id,
-        periodo_opciones=PERIODO_OPCIONES,
-        active_nav="wizard",
-        modalidades=(MODALIDAD_CONVENCIONAL, MODALIDAD_COMPRA_INTELIGENTE),
-        casos_prueba=CASOS_PRUEBA,
-    )
+    return _render_wizard_page(defaults, flash_caso=caso, selected_catalogo_id=selected_catalogo_id)
+
+
+@app.route("/plans/<int:credito_id>/editar", methods=["GET", "POST"])
+@login_required
+def plan_edit(credito_id: int):
+    if request.method == "POST":
+        try:
+            data = _parse_simulation_form(request.form)
+            _update_credito(credito_id, data)
+            flash("Simulación actualizada correctamente.")
+            return redirect(url_for("plan_detail", credito_id=credito_id))
+        except Exception as exc:
+            flash(f"Error al actualizar: {exc}")
+            defaults = _load_credito_defaults(credito_id) or _get_defaults()
+            defaults.update({k: request.form.get(k, defaults.get(k, "")) for k in DEFAULTS_KEYS if k in request.form})
+            return _render_wizard_page(defaults, edit_credito_id=credito_id)
+    defaults = _load_credito_defaults(credito_id)
+    if not defaults:
+        flash("Simulación no encontrada o sin permiso para editarla.")
+        return redirect(url_for("dashboard"))
+    flash(f"Editando simulación #{credito_id}. Modifica los datos y guarda los cambios.")
+    return _render_wizard_page(defaults, edit_credito_id=credito_id)
 
 
 @app.route("/settings", methods=["GET", "POST"])
@@ -1048,6 +1306,18 @@ def admin_panel():
         usuarios=usuarios,
         active_nav="admin",
     )
+
+
+@app.post("/admin/catalogo/reseed")
+@admin_required
+def admin_reseed_catalogo():
+    from db import _ensure_catalogo
+
+    conn = get_conn()
+    _ensure_catalogo(conn)
+    conn.close()
+    flash(f"Catálogo restaurado: {catalogo_count()} vehículos.")
+    return redirect(url_for("admin_panel"))
 
 
 @app.post("/admin/users/<int:user_id>/delete")
@@ -1214,7 +1484,7 @@ def plan_csv(credito_id: int):
     filename = f"credito_{credito_id}_cronograma.csv"
     return Response(
         output,
-        mimetype="text/csv",
+        mimetype="application/vnd.ms-excel",
         headers={"Content-Disposition": f"attachment; filename={filename}"},
     )
 

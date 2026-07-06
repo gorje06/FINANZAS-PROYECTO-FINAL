@@ -3,6 +3,9 @@
 {% block page_title %}Panel de administración{% endblock %}
 {% block topbar_actions %}
 <a href="{{ url_for('dashboard') }}" class="btn btn-ghost btn-sm">← Dashboard</a>
+<form method="post" action="{{ url_for('admin_reseed_catalogo') }}" style="display:inline;" onsubmit="return confirm('¿Restaurar los 12 vehículos del catálogo base?');">
+  <button type="submit" class="btn btn-secondary btn-sm">Restaurar catálogo</button>
+</form>
 {% endblock %}
 {% block content %}
 
@@ -65,7 +68,8 @@
           <td>{{ plan.moneda }}</td>
           <td style="text-align:right;white-space:nowrap;">
             <a href="{{ url_for('plan_detail', credito_id=plan.id) }}" class="btn btn-secondary btn-sm">Ver</a>
-            <a href="{{ url_for('plan_csv', credito_id=plan.id) }}" class="btn btn-ghost btn-sm">CSV</a>
+            <a href="{{ url_for('plan_edit', credito_id=plan.id) }}" class="btn btn-ghost btn-sm">Editar</a>
+            <a href="{{ url_for('plan_csv', credito_id=plan.id) }}" class="btn btn-ghost btn-sm">Excel</a>
             <form method="post" action="{{ url_for('admin_delete_plan', credito_id=plan.id) }}" style="display:inline;" onsubmit="return confirm('¿Eliminar esta simulación?');">
               <button type="submit" class="btn btn-danger btn-sm">Eliminar</button>
             </form>
