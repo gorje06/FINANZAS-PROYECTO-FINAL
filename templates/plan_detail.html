@@ -94,6 +94,72 @@
   </div>
 </div>
 
+<div class="card animate-in sbs-transparency-card" style="padding:var(--space-5) var(--space-6);margin-bottom:var(--space-6);border-left:4px solid var(--color-primary-600);">
+  <div style="display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-start;gap:var(--space-4);margin-bottom:var(--space-4);">
+    <div>
+      <h3 style="margin:0 0 var(--space-2);font-size:var(--text-lg);color:var(--color-primary-900);">Resumen de transparencia (SBS)</h3>
+      <p style="margin:0;font-size:var(--text-sm);color:var(--color-neutral-600);max-width:52rem;">
+        Información clara sobre tasas, comisiones, seguros y costos del crédito, conforme a la
+        <strong>Resolución SBS N.° 8181-2012</strong> y la Ley N.° 26702.
+      </p>
+    </div>
+    <span class="badge badge-accent">Transparencia financiera</span>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:var(--space-4);">
+    <div class="sbs-transparency-item">
+      <div class="kpi-label">TCEA (costo efectivo anual)</div>
+      <div style="font-size:var(--text-xl);font-weight:700;color:var(--color-accent-600);">{{ "%.4f"|format(transparencia_sbs.tcea_pct) }}%</div>
+    </div>
+    <div class="sbs-transparency-item">
+      <div class="kpi-label">TEA · TEM aplicadas</div>
+      <div style="font-size:var(--text-base);font-weight:600;color:var(--color-primary-900);">{{ "%.4f"|format(transparencia_sbs.tea_pct) }}% · {{ "%.6f"|format(transparencia_sbs.tem_pct) }}%</div>
+    </div>
+    <div class="sbs-transparency-item">
+      <div class="kpi-label">Capital financiado</div>
+      <div style="font-size:var(--text-base);font-weight:600;">{{ sym }} {{ "%.2f"|format(transparencia_sbs.capital_financiado) }}</div>
+    </div>
+    <div class="sbs-transparency-item">
+      <div class="kpi-label">Gastos iniciales financiados</div>
+      <div style="font-size:var(--text-base);font-weight:600;">{{ sym }} {{ "%.2f"|format(transparencia_sbs.gastos_iniciales) }}</div>
+    </div>
+    <div class="sbs-transparency-item">
+      <div class="kpi-label">Seguro desgravamen (mensual)</div>
+      <div style="font-size:var(--text-base);font-weight:600;">{{ "%.4f"|format(transparencia_sbs.seguro_desgravamen_pct) }}% sobre saldo</div>
+    </div>
+    <div class="sbs-transparency-item">
+      <div class="kpi-label">Seguro vehicular (mensual)</div>
+      <div style="font-size:var(--text-base);font-weight:600;">{{ "%.4f"|format(transparencia_sbs.seguro_vehicular_pct) }}% sobre saldo</div>
+    </div>
+    <div class="sbs-transparency-item">
+      <div class="kpi-label">Portes por cuota</div>
+      <div style="font-size:var(--text-base);font-weight:600;">{{ sym }} {{ "%.2f"|format(transparencia_sbs.portes_mensual) }}</div>
+    </div>
+    <div class="sbs-transparency-item">
+      <div class="kpi-label">Total intereses del cronograma</div>
+      <div style="font-size:var(--text-base);font-weight:600;">{{ sym }} {{ "%.2f"|format(transparencia_sbs.total_intereses) }}</div>
+    </div>
+    <div class="sbs-transparency-item">
+      <div class="kpi-label">Total seguros del cronograma</div>
+      <div style="font-size:var(--text-base);font-weight:600;">{{ sym }} {{ "%.2f"|format(transparencia_sbs.total_seguros) }}</div>
+    </div>
+    <div class="sbs-transparency-item">
+      <div class="kpi-label">Total portes del cronograma</div>
+      <div style="font-size:var(--text-base);font-weight:600;">{{ sym }} {{ "%.2f"|format(transparencia_sbs.total_portes) }}</div>
+    </div>
+    <div class="sbs-transparency-item">
+      <div class="kpi-label">Total amortización de capital</div>
+      <div style="font-size:var(--text-base);font-weight:600;">{{ sym }} {{ "%.2f"|format(transparencia_sbs.total_amortizacion) }}</div>
+    </div>
+    <div class="sbs-transparency-item" style="background:var(--color-primary-50);border-radius:var(--radius-md);padding:var(--space-3);">
+      <div class="kpi-label">Total a pagar ({{ transparencia_sbs.num_cuotas }} cuotas)</div>
+      <div style="font-size:var(--text-xl);font-weight:700;color:var(--color-primary-900);">{{ sym }} {{ "%.2f"|format(transparencia_sbs.total_a_pagar) }}</div>
+    </div>
+  </div>
+  <p style="margin:var(--space-4) 0 0;font-size:var(--text-xs);color:var(--color-neutral-500);">
+    El desglose cuota por cuota se muestra en el cronograma inferior y puede exportarse a Excel para entrega al cliente.
+  </p>
+</div>
+
 <div class="chart-container animate-in">
   <div class="chart-title">Interés vs Amortización por Período</div>
   <div class="chart-canvas-wrap">

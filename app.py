@@ -1491,11 +1491,13 @@ def plan_detail(credito_id: int):
     row = conn.execute(
         f"""
         SELECT c.*, cl.nombre_cliente, cl.apellido_cliente, cl.dni_cliente,
-               v.marca_vehiculo, v.modelo_vehiculo, i.van, i.tir, i.tcea
+               v.marca_vehiculo, v.modelo_vehiculo, i.van, i.tir, i.tcea,
+               s.seguro_desgravamen, s.seguro_vehicular, s.portes AS portes_cuota
         FROM credito c
         JOIN cliente cl ON c.id_cliente = cl.id_cliente
         JOIN vehiculo v ON c.id_vehiculo = v.id_vehiculo
         LEFT JOIN indicadores_financieros i ON c.id_credito = i.id_credito
+        LEFT JOIN seguro s ON c.id_credito = s.id_credito
         WHERE c.id_credito = ?{extra}
         """,
         [credito_id, *params],
@@ -1563,6 +1565,31 @@ def plan_detail(credito_id: int):
         for r in schedule
     ]
 
+    total_intereses = sum(r["interes"] for r in schedule_view)
+    total_seguros = sum(r["seguro"] for r in schedule_view)
+    total_portes = sum(r["portes"] for r in schedule_view)
+    total_amortizacion = sum(r["amortizacion"] for r in schedule_view)
+    seguro_desgravamen = _num(_row_get(row, "seguro_desgravamen"))
+    seguro_vehicular = _num(_row_get(row, "seguro_vehicular"))
+    portes_cuota = _num(_row_get(row, "portes_cuota"))
+
+    transparencia_sbs = {
+        "tcea_pct": plan_view["tcea"] * 100,
+        "tea_pct": plan_view["tasa_interes"] * 100,
+        "tem_pct": plan_view["tem"] * 100,
+        "capital_financiado": plan_view["total_financiado"],
+        "gastos_iniciales": gastos_not + gastos_reg + costos_ini,
+        "total_intereses": total_intereses,
+        "total_seguros": total_seguros,
+        "total_portes": total_portes,
+        "total_amortizacion": total_amortizacion,
+        "total_a_pagar": total_pagar,
+        "seguro_desgravamen_pct": seguro_desgravamen * 100,
+        "seguro_vehicular_pct": seguro_vehicular * 100,
+        "portes_mensual": portes_cuota,
+        "num_cuotas": len(schedule_view),
+    }
+
     return render_template(
         "plan_detail.html",
         plan=plan_view,
@@ -1578,6 +1605,7 @@ def plan_detail(credito_id: int):
         gastos_registrales=gastos_reg,
         costos_iniciales=costos_ini,
         tipo_cambio=tipo_cambio,
+        transparencia_sbs=transparencia_sbs,
         chart_labels=[r["periodo"] for r in schedule_view],
         chart_intereses=[r["interes"] for r in schedule_view],
         chart_amort=[r["amortizacion"] for r in schedule_view],
