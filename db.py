@@ -376,7 +376,7 @@ def _migrate_cliente_schema(conn) -> None:
         return
 
     if has_migracion:
-        conn.execute("DROP TABLE cliente_migracion")
+        conn.execute("DROP TABLE IF EXISTS cliente_migracion")
         conn.commit()
 
     ddl_row = conn.execute(
@@ -392,6 +392,7 @@ def _migrate_cliente_schema(conn) -> None:
     conn.executescript(
         f"""
         PRAGMA foreign_keys=OFF;
+        DROP TABLE IF EXISTS cliente_migracion;
         CREATE TABLE cliente_migracion (
             id_cliente INTEGER PRIMARY KEY AUTOINCREMENT,
             id_usuario INTEGER NOT NULL,
