@@ -94,7 +94,9 @@ class TursoCursor:
                 }
             ]
         )
-        payload = result[0]
+        self._apply_pipeline_result(result[-1])
+
+    def _apply_pipeline_result(self, payload: dict) -> None:
         if payload.get("type") != "ok":
             error = payload.get("error") or payload
             raise RuntimeError(f"Turso error: {error}")
@@ -126,9 +128,7 @@ class TursoCursor:
         return self
 
     def executescript(self, script: str) -> "TursoCursor":
-        for statement in _split_sql_script(script):
-            self._execute(statement, ())
-        return self
+        return self.connection._executescript(script)
 
 
 class TursoConnection:
@@ -156,6 +156,21 @@ class TursoConnection:
             raise RuntimeError(f"Turso HTTP {exc.code}: {detail}") from exc
         return data.get("results") or []
 
+    def _executescript(self, script: str) -> TursoCursor:
+        """Ejecuta varias sentencias en un solo pipeline (PRAGMA persiste entre ellas)."""
+        statements = _split_sql_script(script)
+        cur = TursoCursor(self)
+        if not statements:
+            return cur
+        requests_body = [
+            {"type": "execute", "stmt": {"sql": sql, "args": []}}
+            for sql in statements
+        ]
+        results = self._pipeline(requests_body)
+        for payload in results:
+            cur._apply_pipeline_result(payload)
+        return cur
+
     def execute(self, sql: str, params: tuple | list = ()):
         return TursoCursor(self, sql, params)
 
@@ -169,10 +184,7 @@ class TursoConnection:
         return cur
 
     def executescript(self, script: str) -> TursoCursor:
-        cur = TursoCursor(self)
-        for statement in _split_sql_script(script):
-            cur = TursoCursor(self, statement)
-        return cur
+        return self._executescript(script)
 
     def commit(self) -> None:
         return None
