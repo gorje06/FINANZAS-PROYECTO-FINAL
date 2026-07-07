@@ -2,7 +2,7 @@
 
 **Trabajo Final** · Finanzas e Ingeniería Económica · SI642 · UPC · Grupo 2
 
-Simulador web para **vendedores de concesionario**: catálogo de vehículos, wizard de simulación, **Compra Inteligente** (cuota balón + método francés), costos notariales/registrales, cronograma, VAN/TIR/TCEA (perspectiva deudor) y panel de administración.
+Simulador web para la **entidad financiera** (ejecutivos de crédito vehicular): catálogo de vehículos, wizard de simulación, **Compra Inteligente** (cuota balón + método francés), costos notariales/registrales, cronograma, VAN/TIR/TCEA (perspectiva deudor) y panel de administración.
 
 **Demo:** despliega en [Render](https://render.com) con base persistente en [Turso](https://turso.tech).
 
@@ -10,7 +10,7 @@ Simulador web para **vendedores de concesionario**: catálogo de vehículos, wiz
 
 ## Funcionalidades
 
-- Login, registro y roles (vendedor / admin)
+- Login, registro y roles (ejecutivo de la entidad / admin)
 - Catálogo de vehículos con fotos y precios
 - Wizard en 4 pasos: cliente → vehículo → crédito → costos
 - Modalidades: **Convencional** y **Compra Inteligente**

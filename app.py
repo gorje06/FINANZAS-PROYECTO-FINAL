@@ -163,7 +163,7 @@ CASOS_PRUEBA = {
     },
 }
 
-DEFAULTS_KEYS = (
+CREDIT_DEFAULTS_KEYS = (
     "moneda",
     "tipo_tasa",
     "cuota_inicial_pct",
@@ -175,6 +175,15 @@ DEFAULTS_KEYS = (
     "seguro_desgravamen",
     "seguro_vehicular",
     "portes",
+    "modalidad",
+    "cuota_balon_pct",
+    "gastos_notariales",
+    "gastos_registrales",
+    "costos_iniciales",
+    "tipo_cambio",
+)
+
+DEFAULTS_KEYS = CREDIT_DEFAULTS_KEYS + (
     "nombres_cliente",
     "apellidos_cliente",
     "dni_cliente",
@@ -187,12 +196,6 @@ DEFAULTS_KEYS = (
     "precio_vehiculo",
     "tasa_interes",
     "fecha_desembolso",
-    "modalidad",
-    "cuota_balon_pct",
-    "gastos_notariales",
-    "gastos_registrales",
-    "costos_iniciales",
-    "tipo_cambio",
 )
 
 
@@ -233,22 +236,8 @@ def _row_get(row, key: str, default=None):
         return default
 
 
-def _get_client_defaults() -> dict:
-    stored = session.get("defaults") or {}
+def _base_credit_defaults() -> dict:
     return {
-        "nombres_cliente": stored.get("nombres_cliente", ""),
-        "apellidos_cliente": stored.get("apellidos_cliente", ""),
-        "dni_cliente": stored.get("dni_cliente", ""),
-        "correo_cliente": stored.get("correo_cliente", ""),
-        "telefono_cliente": stored.get("telefono_cliente", ""),
-        "direccion_cliente": stored.get("direccion_cliente", ""),
-        "ingresos_mensuales": stored.get("ingresos_mensuales", ""),
-    }
-
-
-def _get_defaults() -> dict:
-    stored = session.get("defaults") or {}
-    base = {
         "moneda": "Soles",
         "tipo_tasa": "Efectiva",
         "cuota_inicial_pct": 20,
@@ -267,40 +256,36 @@ def _get_defaults() -> dict:
         "costos_iniciales": 0,
         "tipo_cambio": 3.75,
     }
-    base.update(_get_client_defaults())
-    base.update(stored)
-    if not base.get("fecha_desembolso"):
-        base["fecha_desembolso"] = date.today().isoformat()
+
+
+def _get_credit_defaults() -> dict:
+    stored = session.get("defaults") or {}
+    base = _base_credit_defaults()
+    for key in CREDIT_DEFAULTS_KEYS:
+        if key in stored and str(stored[key]).strip() != "":
+            base[key] = stored[key]
     return base
 
 
-def _save_profile(user_id: int, form) -> None:
-    del user_id
-    nombres = form.get("nombres_cliente", "").strip()[:100]
-    apellidos = form.get("apellidos_cliente", "").strip()[:100]
-    dni_cliente = form.get("dni_cliente", "").strip()
-    if not nombres or not apellidos:
-        raise ValueError("Nombres y apellidos son obligatorios.")
-    if dni_cliente and not re.fullmatch(r"\d{8}", dni_cliente):
-        raise ValueError("El DNI del cliente debe tener 8 dígitos.")
-    ingresos_raw = form.get("ingresos_mensuales", "").strip()
-    if ingresos_raw:
-        ingresos = float(ingresos_raw)
-        if ingresos <= 0:
-            raise ValueError("Los ingresos mensuales deben ser mayores a 0.")
-    defaults = _get_defaults()
+def _get_wizard_defaults() -> dict:
+    defaults = _get_credit_defaults()
     defaults.update(
         {
-            "nombres_cliente": nombres,
-            "apellidos_cliente": apellidos,
-            "dni_cliente": dni_cliente,
-            "correo_cliente": form.get("correo_cliente", "").strip()[:150],
-            "telefono_cliente": form.get("telefono_cliente", "").strip()[:20],
-            "direccion_cliente": form.get("direccion_cliente", "").strip()[:200],
-            "ingresos_mensuales": ingresos_raw,
+            "nombres_cliente": "",
+            "apellidos_cliente": "",
+            "dni_cliente": "",
+            "correo_cliente": "",
+            "telefono_cliente": "",
+            "direccion_cliente": "",
+            "ingresos_mensuales": "",
+            "marca_vehiculo": "",
+            "modelo_vehiculo": "",
+            "precio_vehiculo": "",
+            "tasa_interes": "",
+            "fecha_desembolso": date.today().isoformat(),
         }
     )
-    session["defaults"] = defaults
+    return defaults
 
 
 def _change_password(user_id: int, current: str, new_pass: str, confirm: str) -> None:
@@ -322,11 +307,11 @@ def _change_password(user_id: int, current: str, new_pass: str, confirm: str) ->
 
 
 def _save_defaults_from_form(form) -> None:
-    defaults = _get_defaults()
-    for key in DEFAULTS_KEYS:
+    defaults = _get_credit_defaults()
+    for key in CREDIT_DEFAULTS_KEYS:
         if key in form and str(form.get(key, "")).strip() != "":
             defaults[key] = form.get(key)
-    session["defaults"] = defaults
+    session["defaults"] = {k: defaults[k] for k in CREDIT_DEFAULTS_KEYS if k in defaults}
 
 
 def _parse_simulation_form(form) -> dict:
@@ -728,7 +713,6 @@ def _create_credito(uid: int, data: dict) -> int:
         )
     conn.commit()
     conn.close()
-    _save_defaults_from_form(data)
     return id_credito
 
 
@@ -879,7 +863,6 @@ def _update_credito(credito_id: int, data: dict) -> int:
     )
     conn.commit()
     conn.close()
-    _save_defaults_from_form(data)
     return credito_id
 
 
@@ -1203,7 +1186,7 @@ def wizard():
             return redirect(url_for("plan_detail", credito_id=id_credito))
         except Exception as exc:
             flash(f"Error en cálculo o registro: {exc}")
-    defaults = _get_defaults()
+    defaults = _get_wizard_defaults()
     caso = request.args.get("caso", "").strip().lower()
     catalogo_id = request.args.get("catalogo", type=int)
     selected_catalogo_id = catalogo_id
@@ -1235,7 +1218,7 @@ def plan_edit(credito_id: int):
             return redirect(url_for("plan_detail", credito_id=credito_id))
         except Exception as exc:
             flash(f"Error al actualizar: {exc}")
-            defaults = _load_credito_defaults(credito_id) or _get_defaults()
+            defaults = _load_credito_defaults(credito_id) or _get_wizard_defaults()
             defaults.update({k: request.form.get(k, defaults.get(k, "")) for k in DEFAULTS_KEYS if k in request.form})
             return _render_wizard_page(defaults, edit_credito_id=credito_id)
     defaults = _load_credito_defaults(credito_id)
@@ -1252,10 +1235,7 @@ def settings():
     if request.method == "POST":
         action = request.form.get("action", "defaults")
         try:
-            if action == "profile":
-                _save_profile(session["user_id"], request.form)
-                flash("Precarga de cliente guardada.")
-            elif action == "password":
+            if action == "password":
                 _change_password(
                     session["user_id"],
                     request.form.get("current_password", ""),
@@ -1271,14 +1251,13 @@ def settings():
         return redirect(url_for("settings"))
     conn = get_conn()
     user_row = conn.execute(
-        "SELECT usuario_login, dni_usuario FROM usuario WHERE id_usuario = ?",
+        "SELECT usuario_login, dni_usuario, rol FROM usuario WHERE id_usuario = ?",
         (session["user_id"],),
     ).fetchone()
     conn.close()
     return render_template(
         "settings.html",
-        defaults=_get_defaults(),
-        profile=_get_client_defaults(),
+        defaults=_get_credit_defaults(),
         account=user_row,
         active_nav="settings",
     )

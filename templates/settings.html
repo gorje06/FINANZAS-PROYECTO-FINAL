@@ -1,163 +1,129 @@
-{% extends "layout_app.html" %}
-{% from "macros.html" import help_tip %}
-{% block title %}Configuración — FinanCuota{% endblock %}
-{% block page_title %}Configuración{% endblock %}
-{% block content %}
-
-<div class="card animate-in" style="padding:var(--space-6);max-width:760px;margin-bottom:var(--space-6);">
-  <h3 style="margin-bottom:var(--space-2);color:var(--color-primary-900);">Cliente habitual (precarga)</h3>
-  <p style="color:var(--color-neutral-600);margin-bottom:var(--space-5);font-size:var(--text-sm);">Datos del solicitante que se precargan al crear una nueva simulación. Cada crédito guarda su propio cliente en la base de datos.</p>
-  <form method="post">
-    <input type="hidden" name="action" value="profile" />
-    <div class="form-row">
-      <div class="form-group">
-        <label class="form-label">Usuario</label>
-        <input class="form-input" value="{{ account.usuario_login if account else '' }}" readonly disabled />
-      </div>
-      <div class="form-group">
-        <label class="form-label">DNI {{ help_tip('Registrado al crear la cuenta. No se puede modificar.') }}</label>
-        <input class="form-input" value="{{ account.dni_usuario if account else session.get('dni','') }}" readonly disabled />
-      </div>
-    </div>
-    <div class="form-row">
-      <div class="form-group">
-        <label class="form-label">Nombres <span class="required">*</span></label>
-        <input class="form-input" name="nombres_cliente" required value="{{ profile.get('nombres_cliente', defaults.get('nombres_cliente','')) }}" />
-      </div>
-      <div class="form-group">
-        <label class="form-label">Apellidos <span class="required">*</span></label>
-        <input class="form-input" name="apellidos_cliente" required value="{{ profile.get('apellidos_cliente', defaults.get('apellidos_cliente','')) }}" />
-      </div>
-    </div>
-    <div class="form-row">
-      <div class="form-group">
-        <label class="form-label">DNI del cliente {{ help_tip('Se precarga en el wizard. Cada simulación puede usar otro DNI.') }}</label>
-        <input class="form-input" name="dni_cliente" maxlength="8" pattern="\d{8}" value="{{ profile.get('dni_cliente', defaults.get('dni_cliente','')) }}" />
-      </div>
-      <div class="form-group">
-        <label class="form-label">Ingresos mensuales</label>
-        <input class="form-input" name="ingresos_mensuales" type="number" step="0.01" min="0.01" value="{{ profile.get('ingresos_mensuales', defaults.get('ingresos_mensuales','')) }}" />
-      </div>
-    </div>
-    <div class="form-row">
-      <div class="form-group">
-        <label class="form-label">Correo</label>
-        <input class="form-input" name="correo_cliente" type="email" value="{{ profile.get('correo_cliente', defaults.get('correo_cliente','')) }}" />
-      </div>
-      <div class="form-group">
-        <label class="form-label">Teléfono</label>
-        <input class="form-input" name="telefono_cliente" maxlength="9" value="{{ profile.get('telefono_cliente', defaults.get('telefono_cliente','')) }}" />
-      </div>
-    </div>
-    <div class="form-group">
-      <label class="form-label">Dirección</label>
-      <input class="form-input" name="direccion_cliente" value="{{ profile.get('direccion_cliente', defaults.get('direccion_cliente','')) }}" />
-    </div>
-    <button type="submit" class="btn btn-accent">Guardar precarga</button>
-  </form>
-</div>
-
-<div class="card animate-in" style="padding:var(--space-6);max-width:760px;margin-bottom:var(--space-6);">
-  <h3 style="margin-bottom:var(--space-2);color:var(--color-primary-900);">Cambiar contraseña</h3>
-  <form method="post">
-    <input type="hidden" name="action" value="password" />
-    <div class="form-group">
-      <label class="form-label">Contraseña actual</label>
-      <input class="form-input" name="current_password" type="password" required autocomplete="current-password" />
-    </div>
-    <div class="form-row">
-      <div class="form-group">
-        <label class="form-label">Nueva contraseña</label>
-        <input class="form-input" name="new_password" type="password" minlength="6" required autocomplete="new-password" />
-      </div>
-      <div class="form-group">
-        <label class="form-label">Repetir nueva contraseña</label>
-        <input class="form-input" name="new_password_confirm" type="password" minlength="6" required autocomplete="new-password" />
-      </div>
-    </div>
-    <button type="submit" class="btn btn-secondary">Actualizar contraseña</button>
-  </form>
-</div>
-
-<div class="card animate-in" style="padding:var(--space-6);max-width:760px;">
-  <h3 style="margin-bottom:var(--space-2);color:var(--color-primary-900);">Valores por defecto del crédito</h3>
-  <p style="color:var(--color-neutral-600);margin-bottom:var(--space-6);font-size:var(--text-sm);">Se precargan al abrir Nueva Simulación. Puedes cambiarlos en cada operación.</p>
-  <form method="post">
-    <input type="hidden" name="action" value="defaults" />
-    <div class="form-row">
-      <div class="form-group">
-        <label class="form-label">Moneda predeterminada</label>
-        <select class="form-select" name="moneda">
-          <option {% if defaults.get('moneda','Soles')=='Soles' %}selected{% endif %}>Soles</option>
-          <option {% if defaults.get('moneda')=='Dólares' %}selected{% endif %}>Dólares</option>
-        </select>
-      </div>
-      <div class="form-group">
-        <label class="form-label">Modalidad</label>
-        <select class="form-select" name="modalidad">
-          <option {% if defaults.get('modalidad','Convencional')=='Convencional' %}selected{% endif %}>Convencional</option>
-          <option {% if defaults.get('modalidad')=='Compra Inteligente' %}selected{% endif %}>Compra Inteligente</option>
-        </select>
-      </div>
-    </div>
-    <div class="form-row">
-      <div class="form-group">
-        <label class="form-label">Tipo de tasa</label>
-        <select class="form-select" name="tipo_tasa">
-          <option {% if defaults.get('tipo_tasa','Efectiva')=='Efectiva' %}selected{% endif %}>Efectiva</option>
-          <option {% if defaults.get('tipo_tasa')=='Nominal' %}selected{% endif %}>Nominal</option>
-        </select>
-      </div>
-      <div class="form-group">
-        <label class="form-label">Cuota inicial (%) {{ help_tip('Porcentaje sugerido al abrir el wizard.') }}</label>
-        <input class="form-input" name="cuota_inicial_pct" type="number" step="0.01" value="{{ defaults.get('cuota_inicial_pct', 20) }}" />
-      </div>
-    </div>
-    <div class="form-row">
-      <div class="form-group">
-        <label class="form-label">Plazo (meses)</label>
-        <input class="form-input" name="plazo_meses" type="number" value="{{ defaults.get('plazo_meses', 48) }}" />
-      </div>
-      <div class="form-group">
-        <label class="form-label">Cuota balón (%)</label>
-        <input class="form-input" name="cuota_balon_pct" type="number" step="0.01" value="{{ defaults.get('cuota_balon_pct', 0) }}" />
-      </div>
-    </div>
-    <div class="form-row">
-      <div class="form-group">
-        <label class="form-label">Seguro desgravamen (%)</label>
-        <input class="form-input" name="seguro_desgravamen" type="number" step="0.0001" value="{{ defaults.get('seguro_desgravamen', 0.03) }}" />
-      </div>
-      <div class="form-group">
-        <label class="form-label">Seguro vehicular (%)</label>
-        <input class="form-input" name="seguro_vehicular" type="number" step="0.0001" value="{{ defaults.get('seguro_vehicular', 0.025) }}" />
-      </div>
-    </div>
-    <div class="form-row">
-      <div class="form-group">
-        <label class="form-label">Portes por cuota</label>
-        <input class="form-input" name="portes" type="number" step="0.01" value="{{ defaults.get('portes', 4) }}" />
-      </div>
-      <div class="form-group">
-        <label class="form-label">Tipo de cambio (S/ por US$)</label>
-        <input class="form-input" name="tipo_cambio" type="number" step="0.0001" value="{{ defaults.get('tipo_cambio', 3.75) }}" />
-      </div>
-    </div>
-    <div class="form-row">
-      <div class="form-group">
-        <label class="form-label">Gastos notariales</label>
-        <input class="form-input" name="gastos_notariales" type="number" step="0.01" min="0" value="{{ defaults.get('gastos_notariales', 0) }}" />
-      </div>
-      <div class="form-group">
-        <label class="form-label">Gastos registrales</label>
-        <input class="form-input" name="gastos_registrales" type="number" step="0.01" min="0" value="{{ defaults.get('gastos_registrales', 0) }}" />
-      </div>
-    </div>
-    <div class="form-group">
-      <label class="form-label">Otros costos iniciales</label>
-      <input class="form-input" name="costos_iniciales" type="number" step="0.01" min="0" value="{{ defaults.get('costos_iniciales', 0) }}" />
-    </div>
-    <button type="submit" class="btn btn-accent">Guardar valores por defecto</button>
-  </form>
-</div>
-{% endblock %}
+{% extends "layout_app.html" %}
+{% from "macros.html" import help_tip %}
+{% block title %}Configuración — FinanCuota{% endblock %}
+{% block page_title %}Configuración{% endblock %}
+{% block content %}
+
+<div class="card animate-in" style="padding:var(--space-6);max-width:760px;margin-bottom:var(--space-6);">
+  <h3 style="margin-bottom:var(--space-2);color:var(--color-primary-900);">Mi perfil</h3>
+  <p style="color:var(--color-neutral-600);margin-bottom:var(--space-5);font-size:var(--text-sm);">Datos de tu cuenta en la entidad financiera. Los clientes se registran en cada simulación.</p>
+  <div class="form-row">
+    <div class="form-group">
+      <label class="form-label">Usuario</label>
+      <input class="form-input" value="{{ account.usuario_login if account else '' }}" readonly disabled />
+    </div>
+    <div class="form-group">
+      <label class="form-label">DNI {{ help_tip('Registrado al crear la cuenta. No se puede modificar.') }}</label>
+      <input class="form-input" value="{{ account.dni_usuario if account else session.get('dni','') }}" readonly disabled />
+    </div>
+  </div>
+  <div class="form-group">
+    <label class="form-label">Rol</label>
+    <input class="form-input" value="{{ 'Administrador' if account and account.rol == 'admin' else 'Ejecutivo' }}" readonly disabled />
+  </div>
+</div>
+
+<div class="card animate-in" style="padding:var(--space-6);max-width:760px;margin-bottom:var(--space-6);">
+  <h3 style="margin-bottom:var(--space-2);color:var(--color-primary-900);">Cambiar contraseña</h3>
+  <form method="post">
+    <input type="hidden" name="action" value="password" />
+    <div class="form-group">
+      <label class="form-label">Contraseña actual</label>
+      <input class="form-input" name="current_password" type="password" required autocomplete="current-password" />
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Nueva contraseña</label>
+        <input class="form-input" name="new_password" type="password" minlength="6" required autocomplete="new-password" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Repetir nueva contraseña</label>
+        <input class="form-input" name="new_password_confirm" type="password" minlength="6" required autocomplete="new-password" />
+      </div>
+    </div>
+    <button type="submit" class="btn btn-secondary">Actualizar contraseña</button>
+  </form>
+</div>
+
+<div class="card animate-in" style="padding:var(--space-6);max-width:760px;">
+  <h3 style="margin-bottom:var(--space-2);color:var(--color-primary-900);">Valores por defecto del crédito</h3>
+  <p style="color:var(--color-neutral-600);margin-bottom:var(--space-6);font-size:var(--text-sm);">Se precargan al abrir Nueva Simulación. Puedes cambiarlos en cada operación. Guardar aquí no afecta simulaciones ya registradas.</p>
+  <form method="post">
+    <input type="hidden" name="action" value="defaults" />
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Moneda predeterminada</label>
+        <select class="form-select" name="moneda">
+          <option {% if defaults.get('moneda','Soles')=='Soles' %}selected{% endif %}>Soles</option>
+          <option {% if defaults.get('moneda')=='Dólares' %}selected{% endif %}>Dólares</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Modalidad</label>
+        <select class="form-select" name="modalidad">
+          <option {% if defaults.get('modalidad','Convencional')=='Convencional' %}selected{% endif %}>Convencional</option>
+          <option {% if defaults.get('modalidad')=='Compra Inteligente' %}selected{% endif %}>Compra Inteligente</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Tipo de tasa</label>
+        <select class="form-select" name="tipo_tasa">
+          <option {% if defaults.get('tipo_tasa','Efectiva')=='Efectiva' %}selected{% endif %}>Efectiva</option>
+          <option {% if defaults.get('tipo_tasa')=='Nominal' %}selected{% endif %}>Nominal</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Cuota inicial (%) {{ help_tip('Porcentaje sugerido al abrir el wizard.') }}</label>
+        <input class="form-input" name="cuota_inicial_pct" type="number" step="0.01" value="{{ defaults.get('cuota_inicial_pct', 20) }}" />
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Plazo (meses)</label>
+        <input class="form-input" name="plazo_meses" type="number" value="{{ defaults.get('plazo_meses', 48) }}" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Cuota balón (%)</label>
+        <input class="form-input" name="cuota_balon_pct" type="number" step="0.01" value="{{ defaults.get('cuota_balon_pct', 0) }}" />
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Seguro desgravamen (%)</label>
+        <input class="form-input" name="seguro_desgravamen" type="number" step="0.0001" value="{{ defaults.get('seguro_desgravamen', 0.03) }}" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Seguro vehicular (%)</label>
+        <input class="form-input" name="seguro_vehicular" type="number" step="0.0001" value="{{ defaults.get('seguro_vehicular', 0.025) }}" />
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Portes por cuota</label>
+        <input class="form-input" name="portes" type="number" step="0.01" value="{{ defaults.get('portes', 4) }}" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Tipo de cambio (S/ por US$)</label>
+        <input class="form-input" name="tipo_cambio" type="number" step="0.0001" value="{{ defaults.get('tipo_cambio', 3.75) }}" />
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Gastos notariales</label>
+        <input class="form-input" name="gastos_notariales" type="number" step="0.01" min="0" value="{{ defaults.get('gastos_notariales', 0) }}" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Gastos registrales</label>
+        <input class="form-input" name="gastos_registrales" type="number" step="0.01" min="0" value="{{ defaults.get('gastos_registrales', 0) }}" />
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Otros costos iniciales</label>
+      <input class="form-input" name="costos_iniciales" type="number" step="0.01" min="0" value="{{ defaults.get('costos_iniciales', 0) }}" />
+    </div>
+    <button type="submit" class="btn btn-accent">Guardar valores por defecto</button>
+  </form>
+</div>
+{% endblock %}
