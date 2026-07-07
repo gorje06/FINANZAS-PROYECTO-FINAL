@@ -78,8 +78,16 @@ static/         # Estilos, JS e imágenes del catálogo
 
 ---
 
-## Autor
+## Integrantes — Grupo 2
 
-Jorge Cespedes · **gorje06** · UPC 2026-1
+| # | Integrante | Código UPC |
+|---|------------|------------|
+| 1 | Cespedes Gonzales, Jorge Samuel Alexander | U202416382 |
+| 2 | Huaman Cuba, Johan Giovani | U202417448 |
+| 3 | Alva Camino, Max | U202210675 |
+| 4 | Lopez Montenegro, Rony Joseph | U202224637 |
+| 5 | Uribe Linares, Francisco Javier | U20211B686 |
+
+**Curso:** Finanzas e Ingeniería Económica · SI642 · UPC · 2026-1
 
 Repositorio: https://github.com/gorje06/FINANZAS-PROYECTO-FINAL

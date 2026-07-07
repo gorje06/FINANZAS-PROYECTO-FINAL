@@ -1,4 +1,4 @@
-"""FinanCuota — simulador de crédito vehicular (método francés). Autor: gorje."""
+"""FinanCuota — simulador de crédito vehicular. Grupo 2 — UPC SI642."""
 
 import csv
 import io
