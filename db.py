@@ -350,10 +350,35 @@ def catalogo_count(conn=None) -> int:
 
 def _migrate_cliente_schema(conn) -> None:
     """Quita UNIQUE(id_usuario) para permitir varios clientes por vendedor."""
-    if not conn.execute(
-        "SELECT name FROM sqlite_master WHERE type='table' AND name='cliente'"
-    ).fetchone():
+    has_cliente = bool(
+        conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='cliente'"
+        ).fetchone()
+    )
+    has_migracion = bool(
+        conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='cliente_migracion'"
+        ).fetchone()
+    )
+
+    if not has_cliente and has_migracion:
+        conn.executescript(
+            """
+            ALTER TABLE cliente_migracion RENAME TO cliente;
+            CREATE INDEX IF NOT EXISTS idx_cliente_usuario ON cliente(id_usuario);
+            """
+        )
+        conn.commit()
+        has_cliente = True
+        has_migracion = False
+
+    if not has_cliente:
         return
+
+    if has_migracion:
+        conn.execute("DROP TABLE cliente_migracion")
+        conn.commit()
+
     ddl_row = conn.execute(
         "SELECT sql FROM sqlite_master WHERE type='table' AND name='cliente'"
     ).fetchone()
