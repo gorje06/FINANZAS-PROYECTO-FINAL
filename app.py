@@ -559,14 +559,23 @@ def _delete_credito(conn, credito_id: int) -> None:
         "SELECT id_cliente, id_vehiculo FROM credito WHERE id_credito = ?",
         (credito_id,),
     ).fetchone()
+    if not row:
+        return
+    id_cliente = row["id_cliente"]
+    id_vehiculo = row["id_vehiculo"]
     conn.execute("DELETE FROM cronograma_pago WHERE id_credito = ?", (credito_id,))
     conn.execute("DELETE FROM indicadores_financieros WHERE id_credito = ?", (credito_id,))
     conn.execute("DELETE FROM seguro WHERE id_credito = ?", (credito_id,))
     conn.execute("DELETE FROM credito WHERE id_credito = ?", (credito_id,))
-    if row:
-        id_cliente = row["id_cliente"]
-        id_vehiculo = row["id_vehiculo"]
+    if not conn.execute(
+        "SELECT 1 FROM credito WHERE id_cliente = ? LIMIT 1",
+        (id_cliente,),
+    ).fetchone():
         conn.execute("DELETE FROM cliente WHERE id_cliente = ?", (id_cliente,))
+    if not conn.execute(
+        "SELECT 1 FROM credito WHERE id_vehiculo = ? LIMIT 1",
+        (id_vehiculo,),
+    ).fetchone():
         conn.execute("DELETE FROM vehiculo WHERE id_vehiculo = ?", (id_vehiculo,))
 
 
@@ -1331,16 +1340,19 @@ def admin_delete_user(user_id: int):
 @app.post("/admin/plans/<int:credito_id>/delete")
 @admin_required
 def admin_delete_plan(credito_id: int):
-    conn = get_conn()
-    row = conn.execute("SELECT id_credito FROM credito WHERE id_credito = ?", (credito_id,)).fetchone()
-    if not row:
+    try:
+        conn = get_conn()
+        row = conn.execute("SELECT id_credito FROM credito WHERE id_credito = ?", (credito_id,)).fetchone()
+        if not row:
+            conn.close()
+            flash("Simulación no encontrada.")
+            return redirect(url_for("admin_panel"))
+        _delete_credito(conn, credito_id)
+        conn.commit()
         conn.close()
-        flash("Simulación no encontrada.")
-        return redirect(url_for("admin_panel"))
-    _delete_credito(conn, credito_id)
-    conn.commit()
-    conn.close()
-    flash("Simulación eliminada.")
+        flash("Simulación eliminada.")
+    except Exception as exc:
+        flash(f"No se pudo eliminar la simulación: {exc}")
     return redirect(url_for("admin_panel"))
 
 
