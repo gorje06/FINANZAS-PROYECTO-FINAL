@@ -306,14 +306,6 @@ def _change_password(user_id: int, current: str, new_pass: str, confirm: str) ->
     conn.close()
 
 
-def _save_defaults_from_form(form) -> None:
-    defaults = _get_credit_defaults()
-    for key in CREDIT_DEFAULTS_KEYS:
-        if key in form and str(form.get(key, "")).strip() != "":
-            defaults[key] = form.get(key)
-    session["defaults"] = {k: defaults[k] for k in CREDIT_DEFAULTS_KEYS if k in defaults}
-
-
 def _parse_simulation_form(form) -> dict:
     capitalizacion_raw = form.get("capitalizacion", "").strip()
     capitalizacion = int(capitalizacion_raw) if capitalizacion_raw else None
@@ -1070,7 +1062,7 @@ def catalogo():
 
 
 @app.post("/catalogo")
-@login_required
+@admin_required
 def catalogo_create():
     try:
         data = _parse_catalogo_form(request.form)
@@ -1104,7 +1096,7 @@ def catalogo_create():
 
 
 @app.post("/catalogo/<int:catalogo_id>/editar")
-@login_required
+@admin_required
 def catalogo_update(catalogo_id: int):
     try:
         data = _parse_catalogo_form(request.form)
@@ -1147,7 +1139,7 @@ def catalogo_update(catalogo_id: int):
 
 
 @app.post("/catalogo/<int:catalogo_id>/eliminar")
-@login_required
+@admin_required
 def catalogo_delete(catalogo_id: int):
     conn = get_conn()
     row = conn.execute(
@@ -1233,19 +1225,14 @@ def plan_edit(credito_id: int):
 @login_required
 def settings():
     if request.method == "POST":
-        action = request.form.get("action", "defaults")
         try:
-            if action == "password":
-                _change_password(
-                    session["user_id"],
-                    request.form.get("current_password", ""),
-                    request.form.get("new_password", ""),
-                    request.form.get("new_password_confirm", ""),
-                )
-                flash("Contraseña actualizada.")
-            else:
-                _save_defaults_from_form(request.form)
-                flash("Valores por defecto guardados.")
+            _change_password(
+                session["user_id"],
+                request.form.get("current_password", ""),
+                request.form.get("new_password", ""),
+                request.form.get("new_password_confirm", ""),
+            )
+            flash("Contraseña actualizada.")
         except Exception as exc:
             flash(str(exc))
         return redirect(url_for("settings"))
@@ -1257,7 +1244,6 @@ def settings():
     conn.close()
     return render_template(
         "settings.html",
-        defaults=_get_credit_defaults(),
         account=user_row,
         active_nav="settings",
     )

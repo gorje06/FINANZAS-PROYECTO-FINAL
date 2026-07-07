@@ -2,7 +2,9 @@
 {% block title %}Catálogo — FinanCuota{% endblock %}
 {% block page_title %}Catálogo de Vehículos{% endblock %}
 {% block topbar_actions %}
+{% if is_admin %}
 <button type="button" class="btn btn-accent btn-sm" id="btn-add-vehicle" onclick="openVehicleModal()">+ Agregar vehículo</button>
+{% endif %}
 {% endblock %}
 {% block content %}
 <div class="catalog-toolbar animate-in">
@@ -62,8 +64,10 @@
         <div class="catalog-card-actions">
           <button type="button" class="btn btn-ghost btn-sm" onclick="openVehicleInfoModal(JSON.parse(this.closest('.catalog-card').dataset.vehicle))">ℹ Más info</button>
           <a href="{{ url_for('wizard', catalogo=v.id_catalogo) }}" class="btn btn-accent btn-sm">Simular</a>
+          {% if is_admin %}
           <button type="button" class="btn btn-ghost btn-sm" onclick="openVehicleModal(JSON.parse(this.closest('.catalog-card').dataset.vehicle))">Editar</button>
           <button type="button" class="btn btn-ghost btn-sm catalog-btn-delete" onclick="confirmDeleteVehicle({{ v.id_catalogo }}, '{{ v.marca }} {{ v.modelo }}')">Eliminar</button>
+          {% endif %}
         </div>
       </div>
     </div>
@@ -79,11 +83,14 @@
 <div class="empty-state animate-in">
   <div class="empty-state-icon">🚗</div>
   <div class="empty-state-title">Catálogo vacío</div>
-  <div class="empty-state-text">Agrega vehículos con el botón superior para empezar.</div>
+  <div class="empty-state-text">{% if is_admin %}Agrega vehículos con el botón superior para empezar.{% else %}El catálogo será actualizado por el administrador.{% endif %}</div>
+  {% if is_admin %}
   <button type="button" class="btn btn-accent btn-lg" onclick="openVehicleModal()">+ Agregar vehículo</button>
+  {% endif %}
 </div>
 {% endif %}
 
+{% if is_admin %}
 <div class="modal-backdrop" id="vehicle-modal">
   <div class="modal modal-lg">
     <h3 class="modal-title" id="vehicle-modal-title">Agregar vehículo</h3>
@@ -168,6 +175,7 @@
     </form>
   </div>
 </div>
+{% endif %}
 
 <div class="modal-backdrop" id="vehicle-info-modal">
   <div class="modal modal-lg vehicle-info-modal">
