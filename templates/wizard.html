@@ -10,8 +10,9 @@
 <div class="card animate-in" style="padding:var(--space-4) var(--space-6);margin-bottom:var(--space-4);">
   <p style="margin:0 0 var(--space-3);font-size:var(--text-sm);color:var(--color-neutral-600);">Casos de prueba del informe (cap. 3.4):</p>
   <div style="display:flex;flex-wrap:wrap;gap:var(--space-3);">
-    <a href="{{ url_for('wizard', caso='carlos') }}" class="btn btn-ghost btn-sm">Caso 1 — Carlos Ramírez (convencional)</a>
-    <a href="{{ url_for('wizard', caso='maria') }}" class="btn btn-ghost btn-sm">Caso 2 — María López (Compra Inteligente)</a>
+    {% for caso_key, caso_label in casos_prueba_orden %}
+    <a href="{{ url_for('wizard', caso=caso_key) }}" class="btn btn-ghost btn-sm">{{ caso_label }}</a>
+    {% endfor %}
   </div>
 </div>
 {% else %}

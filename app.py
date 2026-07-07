@@ -168,7 +168,76 @@ CASOS_PRUEBA = {
         "costos_iniciales": "80",
         "tipo_cambio": "3.75",
     },
+    "roberto": {
+        "nombres_cliente": "Roberto",
+        "apellidos_cliente": "Mendoza",
+        "dni_cliente": "45678912",
+        "correo_cliente": "roberto.mendoza@email.com",
+        "telefono_cliente": "934567890",
+        "direccion_cliente": "Av. La Molina 890, Lima",
+        "ingresos_mensuales": "15000",
+        "marca_vehiculo": "Mazda",
+        "modelo_vehiculo": "CX-5 2025",
+        "precio_vehiculo": "155800",
+        "cuota_inicial_pct": "20",
+        "moneda": "Soles",
+        "modalidad": MODALIDAD_COMPRA_INTELIGENTE,
+        "cuota_balon_pct": "30",
+        "tipo_tasa": "Efectiva",
+        "periodo_tasa": "7",
+        "tasa_interes": "12.5",
+        "capitalizacion": "12",
+        "plazo_meses": "48",
+        "fecha_desembolso": "2026-08-20",
+        "periodo_gracia": "Parcial",
+        "meses_gracia": "2",
+        "seguro_desgravamen": "0.03",
+        "seguro_vehicular": "0.025",
+        "portes": "4",
+        "gastos_notariales": "520",
+        "gastos_registrales": "380",
+        "costos_iniciales": "200",
+        "tipo_cambio": "",
+    },
+    "lucia": {
+        "nombres_cliente": "Lucía",
+        "apellidos_cliente": "Fernández",
+        "dni_cliente": "51890234",
+        "correo_cliente": "lucia.fernandez@email.com",
+        "telefono_cliente": "976543210",
+        "direccion_cliente": "Calle Las Begonias 220, Miraflores",
+        "ingresos_mensuales": "22000",
+        "marca_vehiculo": "Ford",
+        "modelo_vehiculo": "Mustang 2024",
+        "precio_vehiculo": "310000",
+        "cuota_inicial_pct": "15",
+        "moneda": "Soles",
+        "modalidad": MODALIDAD_COMPRA_INTELIGENTE,
+        "cuota_balon_pct": "50",
+        "tipo_tasa": "Efectiva",
+        "periodo_tasa": "7",
+        "tasa_interes": "11.8",
+        "capitalizacion": "12",
+        "plazo_meses": "36",
+        "fecha_desembolso": "2026-09-10",
+        "periodo_gracia": "Ninguno",
+        "meses_gracia": "0",
+        "seguro_desgravamen": "0.035",
+        "seguro_vehicular": "0.028",
+        "portes": "5",
+        "gastos_notariales": "680",
+        "gastos_registrales": "450",
+        "costos_iniciales": "250",
+        "tipo_cambio": "",
+    },
 }
+
+CASOS_PRUEBA_ORDEN = [
+    ("carlos", "Caso 1 — Carlos Ramírez (convencional, gracia parcial)"),
+    ("maria", "Caso 2 — María López (Compra Inteligente, USD, balón 40%)"),
+    ("roberto", "Caso 3 — Roberto Mendoza (Compra Inteligente, soles, balón 30%)"),
+    ("lucia", "Caso 4 — Lucía Fernández (Compra Inteligente, soles, balón 50%)"),
+]
 
 CREDIT_DEFAULTS_KEYS = (
     "moneda",
@@ -979,7 +1048,8 @@ def _load_credito_defaults(credito_id: int) -> dict | None:
 def _render_wizard_page(defaults, *, edit_credito_id=None, selected_catalogo_id=None, flash_caso=None):
     if flash_caso and flash_caso in CASOS_PRUEBA:
         defaults.update(CASOS_PRUEBA[flash_caso])
-        flash(f"Caso de prueba cargado: {flash_caso.title()}.")
+        etiqueta = next((label for key, label in CASOS_PRUEBA_ORDEN if key == flash_caso), flash_caso.title())
+        flash(f"Caso de prueba cargado: {etiqueta}")
     if selected_catalogo_id is None and defaults.get("catalogo_id"):
         try:
             selected_catalogo_id = int(defaults["catalogo_id"])
@@ -1002,6 +1072,7 @@ def _render_wizard_page(defaults, *, edit_credito_id=None, selected_catalogo_id=
         active_nav="wizard",
         modalidades=(MODALIDAD_CONVENCIONAL, MODALIDAD_COMPRA_INTELIGENTE),
         casos_prueba=CASOS_PRUEBA,
+        casos_prueba_orden=CASOS_PRUEBA_ORDEN,
         edit_credito_id=edit_credito_id,
     )
 
