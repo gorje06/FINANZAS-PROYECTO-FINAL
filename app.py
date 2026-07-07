@@ -1,6 +1,5 @@
 """FinanCuota — simulador de crédito vehicular. Grupo 2 — UPC SI642."""
 
-import csv
 import io
 import json
 import os
@@ -1611,6 +1610,99 @@ def plan_delete(credito_id: int):
     return redirect(redirect_to)
 
 
+def _build_cronograma_xlsx(credito_id: int, meta: dict, schedule_rows) -> bytes:
+    from openpyxl import Workbook
+    from openpyxl.styles import Alignment, Font, PatternFill
+    from openpyxl.utils import get_column_letter
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Cronograma"
+
+    title_font = Font(bold=True, size=14, color="9F1239")
+    label_font = Font(bold=True)
+    header_font = Font(bold=True, color="FFFFFF")
+    header_fill = PatternFill(fill_type="solid", fgColor="9F1239")
+    total_fill = PatternFill(fill_type="solid", fgColor="F3F4F6")
+    center = Alignment(horizontal="center", vertical="center")
+
+    ws["A1"] = "FinanCuota — Cronograma de pagos"
+    ws["A1"].font = title_font
+
+    sym = "S/" if meta.get("moneda") == "Soles" else "USD"
+    info_rows = [
+        ("Credito N°", str(credito_id)),
+        ("Cliente", meta.get("cliente", "")),
+        ("Vehiculo", meta.get("vehiculo", "")),
+        ("Modalidad", meta.get("modalidad", "")),
+        ("Moneda", meta.get("moneda", "")),
+        ("Capital financiado", f"{sym} {meta.get('capital', 0):,.2f}"),
+        ("Plazo", f"{meta.get('plazo', 0)} meses"),
+    ]
+    row_idx = 3
+    for label, value in info_rows:
+        ws.cell(row=row_idx, column=1, value=label).font = label_font
+        ws.cell(row=row_idx, column=2, value=value)
+        row_idx += 1
+
+    row_idx += 1
+    header_row = row_idx
+    headers = [
+        "N°",
+        "Cuota Total",
+        "Interes",
+        "Amortizacion",
+        "Cuota Balon",
+        "Seguro",
+        "Portes",
+        "Saldo Final",
+    ]
+    for col, header in enumerate(headers, start=1):
+        cell = ws.cell(row=header_row, column=col, value=header)
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = center
+
+    money_cols = {2, 3, 4, 5, 6, 7, 8}
+    data_start = header_row + 1
+    for sched in schedule_rows:
+        row_idx += 1
+        values = [
+            int(_num(_row_get(sched, "numero_cuota"), 0)),
+            _num(_row_get(sched, "cuota_total")),
+            _num(_row_get(sched, "interes_periodo")),
+            _num(_row_get(sched, "amortizacion_periodo")),
+            _num(_row_get(sched, "cuota_balon")),
+            _num(_row_get(sched, "seguro_cuota")),
+            _num(_row_get(sched, "portes_cuota")),
+            _num(_row_get(sched, "saldo_pendiente")),
+        ]
+        for col, value in enumerate(values, start=1):
+            cell = ws.cell(row=row_idx, column=col, value=value)
+            if col in money_cols:
+                cell.number_format = "#,##0.00"
+            if col == 1:
+                cell.alignment = center
+
+    total_row = row_idx + 1
+    ws.cell(row=total_row, column=1, value="TOTAL").font = label_font
+    ws.cell(row=total_row, column=1).fill = total_fill
+    total_cell = ws.cell(row=total_row, column=2, value=f"=SUM(B{data_start}:B{row_idx})")
+    total_cell.font = label_font
+    total_cell.fill = total_fill
+    total_cell.number_format = "#,##0.00"
+
+    widths = (6, 14, 12, 14, 14, 12, 10, 14)
+    for col, width in enumerate(widths, start=1):
+        ws.column_dimensions[get_column_letter(col)].width = width
+
+    ws.freeze_panes = ws.cell(row=data_start, column=1)
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    return buf.getvalue()
+
+
 @app.get("/plans/<int:credito_id>/csv")
 @login_required
 def plan_csv(credito_id: int):
@@ -1618,9 +1710,12 @@ def plan_csv(credito_id: int):
     conn = get_conn()
     row = conn.execute(
         f"""
-        SELECT c.id_credito, cl.nombre_cliente, cl.apellido_cliente
+        SELECT c.id_credito, c.modalidad, c.moneda, c.plazo_meses, c.total_financiado,
+               cl.nombre_cliente, cl.apellido_cliente,
+               v.marca_vehiculo, v.modelo_vehiculo
         FROM credito c
         JOIN cliente cl ON c.id_cliente = cl.id_cliente
+        JOIN vehiculo v ON c.id_vehiculo = v.id_vehiculo
         WHERE c.id_credito = ?{extra}
         """,
         [credito_id, *params],
@@ -1638,28 +1733,20 @@ def plan_csv(credito_id: int):
         flash("Crédito no encontrado.")
         return redirect(url_for("dashboard"))
 
-    buf = io.StringIO()
-    writer = csv.writer(buf)
-    writer.writerow(["N°", "Cuota Total", "Interés", "Amortización", "Cuota Balón", "Seguro", "Portes", "Saldo Final"])
-    for r in schedule:
-        writer.writerow(
-            [
-                r["numero_cuota"],
-                f"{r['cuota_total']:.2f}",
-                f"{r['interes_periodo']:.2f}",
-                f"{r['amortizacion_periodo']:.2f}",
-                f"{r['cuota_balon']:.2f}",
-                f"{r['seguro_cuota']:.2f}",
-                f"{r['portes_cuota']:.2f}",
-                f"{r['saldo_pendiente']:.2f}",
-            ]
-        )
-    output = buf.getvalue()
-    filename = f"credito_{credito_id}_cronograma.csv"
+    meta = {
+        "cliente": f"{_row_get(row, 'nombre_cliente', '')} {_row_get(row, 'apellido_cliente', '')}".strip(),
+        "vehiculo": f"{_row_get(row, 'marca_vehiculo', '')} {_row_get(row, 'modelo_vehiculo', '')}".strip(),
+        "modalidad": _row_get(row, "modalidad") or MODALIDAD_CONVENCIONAL,
+        "moneda": _row_get(row, "moneda") or "Soles",
+        "plazo": _row_get(row, "plazo_meses"),
+        "capital": _num(_row_get(row, "total_financiado")),
+    }
+    xlsx_bytes = _build_cronograma_xlsx(credito_id, meta, schedule)
+    filename = f"credito_{credito_id}_cronograma.xlsx"
     return Response(
-        output,
-        mimetype="application/vnd.ms-excel",
-        headers={"Content-Disposition": f"attachment; filename={filename}"},
+        xlsx_bytes,
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
 
 
