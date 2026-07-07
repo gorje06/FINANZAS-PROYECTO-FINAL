@@ -19,8 +19,16 @@
   </div>
   <div class="form-group">
     <label class="form-label">Rol</label>
-    <input class="form-input" value="{{ 'Administrador' if account and account.rol == 'admin' else 'Ejecutivo' }}" readonly disabled />
+    <input class="form-input" value="{{ 'Administrador' if account and account.rol == 'admin' else 'Oficial de crédito' }}" readonly disabled />
   </div>
+  <form method="post" style="margin-top:var(--space-4);">
+    <input type="hidden" name="action" value="email" />
+    <div class="form-group">
+      <label class="form-label">Correo electrónico</label>
+      <input class="form-input" name="correo_usuario" type="email" maxlength="150" placeholder="tu.correo@ejemplo.com" value="{{ account.correo_usuario if account and account.correo_usuario else '' }}" />
+    </div>
+    <button type="submit" class="btn btn-secondary btn-sm">Guardar correo</button>
+  </form>
 </div>
 
 <div class="card animate-in" style="padding:var(--space-6);max-width:760px;margin-bottom:var(--space-6);">

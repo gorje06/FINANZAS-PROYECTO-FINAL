@@ -306,6 +306,19 @@ def _change_password(user_id: int, current: str, new_pass: str, confirm: str) ->
     conn.close()
 
 
+def _update_user_email(user_id: int, email: str) -> None:
+    correo = email.strip()[:150]
+    if correo and not re.fullmatch(r"[^@]+@[^@]+\.[^@]+", correo):
+        raise ValueError("Ingresa un correo electrónico válido.")
+    conn = get_conn()
+    conn.execute(
+        "UPDATE usuario SET correo_usuario = ? WHERE id_usuario = ?",
+        (correo or None, user_id),
+    )
+    conn.commit()
+    conn.close()
+
+
 def _parse_simulation_form(form) -> dict:
     capitalizacion_raw = form.get("capitalizacion", "").strip()
     capitalizacion = int(capitalizacion_raw) if capitalizacion_raw else None
@@ -408,6 +421,7 @@ def register():
         password = request.form.get("password", "").strip()
         password2 = request.form.get("password_confirm", "").strip()
         dni = request.form.get("dni_usuario", "").strip()
+        correo = request.form.get("correo_usuario", "").strip()[:150]
         if not username or not password:
             flash("Completa usuario y contraseña.")
             return render_template("register.html")
@@ -422,6 +436,9 @@ def register():
             return render_template("register.html")
         if not re.fullmatch(r"\d{8}", dni):
             flash("El DNI debe tener exactamente 8 dígitos.")
+            return render_template("register.html")
+        if correo and not re.fullmatch(r"[^@]+@[^@]+\.[^@]+", correo):
+            flash("Ingresa un correo electrónico válido.")
             return render_template("register.html")
 
         if username.lower() == ADMIN_LOGIN:
@@ -438,10 +455,10 @@ def register():
                 return render_template("register.html")
             conn.execute(
                 """
-                INSERT INTO usuario (usuario_login, password_hash, dni_usuario, rol)
-                VALUES (?, ?, ?, ?)
+                INSERT INTO usuario (usuario_login, password_hash, dni_usuario, rol, correo_usuario)
+                VALUES (?, ?, ?, ?, ?)
                 """,
-                (username, generate_password_hash(password), dni, ROL_USUARIO),
+                (username, generate_password_hash(password), dni, ROL_USUARIO, correo or None),
             )
             conn.commit()
             flash("Cuenta creada. Ahora inicia sesión.")
@@ -1234,20 +1251,25 @@ def plan_edit(credito_id: int):
 @login_required
 def settings():
     if request.method == "POST":
+        action = request.form.get("action", "password")
         try:
-            _change_password(
-                session["user_id"],
-                request.form.get("current_password", ""),
-                request.form.get("new_password", ""),
-                request.form.get("new_password_confirm", ""),
-            )
-            flash("Contraseña actualizada.")
+            if action == "email":
+                _update_user_email(session["user_id"], request.form.get("correo_usuario", ""))
+                flash("Correo actualizado.")
+            else:
+                _change_password(
+                    session["user_id"],
+                    request.form.get("current_password", ""),
+                    request.form.get("new_password", ""),
+                    request.form.get("new_password_confirm", ""),
+                )
+                flash("Contraseña actualizada.")
         except Exception as exc:
             flash(str(exc))
         return redirect(url_for("settings"))
     conn = get_conn()
     user_row = conn.execute(
-        "SELECT usuario_login, dni_usuario, rol FROM usuario WHERE id_usuario = ?",
+        "SELECT usuario_login, dni_usuario, rol, correo_usuario FROM usuario WHERE id_usuario = ?",
         (session["user_id"],),
     ).fetchone()
     conn.close()

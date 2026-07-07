@@ -254,6 +254,12 @@ def init_db() -> None:
             "rol",
             "ALTER TABLE usuario ADD COLUMN rol TEXT NOT NULL DEFAULT 'usuario'",
         )
+        _safe_add_column(
+            conn,
+            "usuario",
+            "correo_usuario",
+            "ALTER TABLE usuario ADD COLUMN correo_usuario TEXT",
+        )
         conn.commit()
 
     if not conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='catalogo_vehiculo'").fetchone():

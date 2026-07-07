@@ -17,6 +17,10 @@
     {{ field_error('err-dni') }}
   </div>
   <div class="form-group">
+    <label class="form-label" for="correo_usuario">Correo electrónico {{ help_tip('Opcional. Se muestra en tu perfil de la entidad financiera.') }}</label>
+    <input class="form-input" id="correo_usuario" name="correo_usuario" type="email" maxlength="150" autocomplete="email" />
+  </div>
+  <div class="form-group">
     <label class="form-label" for="reg_password">Contraseña <span class="required">*</span></label>
     <input class="form-input" id="reg_password" name="password" type="password" autocomplete="new-password" minlength="6" required />
     {{ field_error('err-password') }}
