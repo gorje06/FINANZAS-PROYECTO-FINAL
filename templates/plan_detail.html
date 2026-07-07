@@ -57,8 +57,9 @@
   </div>
   <div class="kpi-card animate-in">
     <div class="kpi-icon">$</div>
-    <div class="kpi-label">VAN (deudor)</div>
-    <div class="kpi-value">{{ sym }} {{ "%.2f"|format(plan.van) }}</div>
+    <div class="kpi-label">Costo VAN (deudor)</div>
+    <div class="kpi-value">{{ sym }} {{ "%.2f"|format(plan.van_costo) }}</div>
+    <div style="font-size:var(--text-xs);color:var(--color-neutral-500);margin-top:var(--space-1);">Valor presente del costo financiero total (descontado a TEM)</div>
   </div>
   <div class="kpi-card animate-in">
     <div class="kpi-icon">%</div>

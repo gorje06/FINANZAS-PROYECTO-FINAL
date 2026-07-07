@@ -12,7 +12,14 @@ from flask import Flask, Response, flash, redirect, render_template, request, se
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from db import DB_PATH, catalogo_count, get_conn, init_db
-from finance import MODALIDAD_COMPRA_INTELIGENTE, MODALIDAD_CONVENCIONAL, build_schedule
+from finance import (
+    MODALIDAD_COMPRA_INTELIGENTE,
+    MODALIDAD_CONVENCIONAL,
+    build_schedule,
+    calcular_tcea_desde_tir_mensual,
+    calcular_tir,
+    calcular_van,
+)
 
 
 app = Flask(__name__)
@@ -600,6 +607,34 @@ def _credito_access_clause() -> tuple[str, list]:
     if _is_admin():
         return "", []
     return " AND cl.id_usuario = ?", [session["user_id"]]
+
+
+def _indicadores_from_flujo(row) -> dict:
+    """Recalcula VAN/TIR/TCEA desde flujo_json para evitar datos viejos en BD."""
+    flujo_raw = _row_get(row, "flujo_json")
+    tem = _num(_row_get(row, "tem"))
+    if flujo_raw:
+        try:
+            flujo = json.loads(flujo_raw)
+            if isinstance(flujo, list) and flujo:
+                tir = calcular_tir(flujo)
+                return {
+                    "van": calcular_van(tem, flujo),
+                    "tir": tir,
+                    "tcea": calcular_tcea_desde_tir_mensual(tir),
+                }
+        except (json.JSONDecodeError, TypeError, ValueError):
+            pass
+    return {
+        "van": _num(_row_get(row, "van")),
+        "tir": _num(_row_get(row, "tir")),
+        "tcea": _num(_row_get(row, "tcea")),
+    }
+
+
+def _van_costo_deudor(van: float) -> float:
+    """Costo en valor presente (positivo) para mostrar al usuario."""
+    return -van
 
 
 def _delete_usuario_completo(target_id: int) -> None:
@@ -1422,6 +1457,7 @@ def plan_detail(credito_id: int):
     tipo_cambio_raw = _row_get(row, "tipo_cambio")
     tipo_cambio = _num(tipo_cambio_raw, default=0.0) if tipo_cambio_raw not in (None, "") else None
 
+    indicadores = _indicadores_from_flujo(row)
     plan_view = {
         "id_credito": _row_get(row, "id_credito"),
         "nombre_cliente": _row_get(row, "nombre_cliente", ""),
@@ -1438,9 +1474,10 @@ def plan_detail(credito_id: int):
         "tasa_interes": _num(_row_get(row, "tasa_interes")),
         "total_financiado": _num(_row_get(row, "total_financiado")),
         "tem": _num(_row_get(row, "tem")),
-        "van": _num(_row_get(row, "van")),
-        "tir": _num(_row_get(row, "tir")),
-        "tcea": _num(_row_get(row, "tcea")),
+        "van": indicadores["van"],
+        "van_costo": _van_costo_deudor(indicadores["van"]),
+        "tir": indicadores["tir"],
+        "tcea": indicadores["tcea"],
     }
     schedule_view = [
         {
